@@ -12,18 +12,21 @@ int main() {
 
   zmq::context_t context(1);
   zmq::socket_t socket(context, zmq::socket_type::pub);
-  socket.bind("tcp://localhost:6060");
+  socket.bind("tcp://*:6060");
 
   while (true) {
-    sea::StatusFeedback statusFeedback;
-    statusFeedback.set_run_state(sea::RUNNING);
-    statusFeedback.set_work_mode(sea::IMPEDANCE);
-    statusFeedback.set_stiffness(10);
-    statusFeedback.set_damping(10);
-    statusFeedback.set_current_position(0.5);
+    sea::ControlFeedback feedback;
+
+    sea::StatusFeedback* statusFeedback = feedback.mutable_status();
+
+    statusFeedback->set_run_state(sea::RUNNING);
+    statusFeedback->set_work_mode(sea::IMPEDANCE);
+    statusFeedback->set_stiffness(10);
+    statusFeedback->set_damping(10);
+    statusFeedback->set_current_position(0.5);
 
     std::string serialized;
-    if (!statusFeedback.SerializeToString(&serialized)) {
+    if (!feedback.SerializeToString(&serialized)) {
       std::cerr << "Failed to serialize statusFeedback." << std::endl;
       continue;
     }
