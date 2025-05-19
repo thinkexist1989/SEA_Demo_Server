@@ -1,0 +1,81 @@
+syntax="proto3";
+
+package sea;
+
+enum RunState {
+  DISABLED = 0;
+  STOPPED = 1;
+  RUNNING = 2;
+  UNKNOWN = 3;
+  ERROR = 4;
+}
+
+enum WorkMode {
+  IMPEDANCE = 0;
+  ZERO_FORCE = 1;
+  POSITION = 2;
+  VELOCITY = 3;
+}
+
+message StatusFeedback {
+  RunState run_state = 1;
+  WorkMode work_mode = 2;
+  double current_position = 3; // in radians
+  double current_velocity = 4; // in radians per second
+
+  int32 encoder1_feedback = 5; // in counts
+  int32 encoder2_feedback = 6; // in counts
+  double external_force = 7; // in N
+  
+  double stiffness = 8; // in N/m 模拟刚度
+  double damping = 9; // in N/(m/s) 模拟阻尼
+  
+}
+
+message ConfigFeedback {
+  int32 encoder1_resolution = 1; // in counts
+  int32 encoder2_resolution = 2; // in counts
+  int32 spring_stiffness = 3; // in N/m
+}
+
+message ControlFeedback {
+  oneof feedback {
+    StatusFeedback status = 1;
+    ConfigFeedback config = 2;
+  }
+}
+
+message SetStiffnessCommand {
+  double stiffness = 1; // in N/m
+}
+
+message SetDampingCommand {
+  double damping = 1; // in N/(m/s)
+}
+
+message SetWorkModeCommand {
+  WorkMode work_mode = 1;
+}
+
+message EnableCommand {
+  bool enable = 1;
+}
+
+message SetPositionCommand {
+  double position = 1; // in radians
+}
+
+message SetVelocityCommand {
+  double velocity = 1; // in radians per second
+}
+
+message ControlCommand {
+  oneof command {
+    SetStiffnessCommand set_stiffness = 1;
+    SetDampingCommand set_damping = 2;
+    SetWorkModeCommand set_work_mode = 3;
+    EnableCommand enable = 4;
+    SetPositionCommand set_position = 5;
+    SetVelocityCommand set_velocity = 6;
+  }
+}

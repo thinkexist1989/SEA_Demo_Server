@@ -1,0 +1,1 @@
+﻿protoc -I=D:\GitHub\SEA_Demo_Unity\Assets\Protos --csharp_out=. --cpp_out=. sea.proto
