@@ -8,9 +8,11 @@
 #include "sea.pb.h"
 #include "sea_control.hpp"
 
+using namespace rocos;
+
 int main() {
 
-  seaControl = new SeaControl("config/control.yml");
+  auto* seaControl = new SeaControl("config/control.yml");
 
 
 

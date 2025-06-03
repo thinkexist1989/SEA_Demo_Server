@@ -30,11 +30,20 @@ struct EventErrorOccurred {};
 struct EventStop_REQ {};
 
 // 动作定义
-const auto action_run = []() { spdlog::info("Running....."); };
+const auto action_run = []() {
+  spdlog::info("Running.....");
+  seaControl->run();
+};
 
-const auto action_stop = []() { spdlog::info("Stopping....."); };
+const auto action_stop = []() {
+  spdlog::info("Stopping.....");
+  seaControl->stop();
+};
 
-const auto action_start = []() { spdlog::info("Starting....."); };
+const auto action_start = []() {
+  spdlog::info("Starting.....");
+  seaControl->start();
+};
 
 // 状态机定义
 struct StateMachine {
@@ -156,17 +165,16 @@ void SeaControl::process_pdo_mapping() {
   ecat_.velocity_actual_value.p =
       ecat_cfg_->findSlaveInputVarPtrByName<int32_t>(
           0, ecat_.velocity_actual_value.name);
-  ecat_.torque_actual_value.p =
-      ecat_cfg_->findSlaveInputVarPtrByName<int16_t>(
-          0, ecat_.torque_actual_value.name);
+  ecat_.torque_actual_value.p = ecat_cfg_->findSlaveInputVarPtrByName<int16_t>(
+      0, ecat_.torque_actual_value.name);
   ecat_.secondary_position_value.p =
       ecat_cfg_->findSlaveInputVarPtrByName<int32_t>(
           0, ecat_.secondary_position_value.name);
   ecat_.secondary_velocity_value.p =
       ecat_cfg_->findSlaveInputVarPtrByName<int32_t>(
           0, ecat_.secondary_velocity_value.name);
-  ecat_.status_word.p = ecat_cfg_->findSlaveInputVarPtrByName<int16_t>(
-      0, ecat_.status_word.name);
+  ecat_.status_word.p =
+      ecat_cfg_->findSlaveInputVarPtrByName<int16_t>(0, ecat_.status_word.name);
 
   ecat_.mode_of_operation.p = ecat_cfg_->findSlaveOutputVarPtrByName<int8_t>(
       0, ecat_.mode_of_operation.name);
@@ -181,29 +189,22 @@ void SeaControl::process_pdo_mapping() {
 }
 
 void SeaControl::start() {
-
+  // 这是主要是使能关节
 }
 
 void SeaControl::run() {
-
+  // 这里是主循环，处理不同的工作模式
 }
 
 void SeaControl::stop() {
+  // 这里是停止运动，下使能
 
 }
 
-void SeaControl::impedance_handler() {
+void SeaControl::impedance_handler() {}
 
-}
+void SeaControl::velocity_handler() {}
 
-void SeaControl::velocity_handler() {
+void SeaControl::position_handler() {}
 
-}
-
-void SeaControl::position_handler() {
-
-}
-
-void SeaControl::zero_force_handler() {
-
-}
+void SeaControl::zero_force_handler() {}

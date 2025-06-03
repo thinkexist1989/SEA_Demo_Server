@@ -45,6 +45,14 @@ message ControlFeedback {
   }
 }
 
+message GetStatusCommand {
+  // This command does not require any parameters.
+}
+
+message GetConfigCommand {
+  // This command does not require any parameters.
+}
+
 message SetStiffnessCommand {
   double stiffness = 1; // in N/m
 }
@@ -77,5 +85,7 @@ message ControlCommand {
     EnableCommand enable = 4;
     SetPositionCommand set_position = 5;
     SetVelocityCommand set_velocity = 6;
+    GetStatusCommand get_status = 7;
+    GetConfigCommand get_config = 8;
   }
 }
