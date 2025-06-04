@@ -47,7 +47,7 @@ const auto action_start = []() {
 
 const auto action_init = []() {
   spdlog::info("Initializing.....");
-  seaControl->start();
+  seaControl->init();
 };
 
 const auto action_reset = []() {
@@ -62,8 +62,8 @@ struct StateMachine {
 
     return make_transition_table(
         // 初始状态
-        *state<class DISABLED> + event<EventInit_REQ> = state<class STOPPED>,
-        state<class STOPPED> + sml::on_entry<_> / action_init,
+        *state<class DISABLED> + event<EventInit_REQ> / action_init = state<class STOPPED>,
+        // state<class STOPPED> + sml::on_entry<_> / action_init,
         // 状态切换
         state<class STOPPED> + event<EventStart_REQ> = state<class STARTING>,
         state<class STARTING> + sml::on_entry<_> / action_start,
@@ -96,7 +96,8 @@ SeaControl::SeaControl(const std::string& config_file) {
 
 void SeaControl::loadConfig(const std::string& config_file) {
   try {
-    config_ = YAML::LoadFile(config_file);
+    auto temp = YAML::LoadFile(config_file);
+    config_ = temp["sea"];
   } catch (const YAML::Exception& e) {
     throw std::runtime_error("Failed to load configuration: " +
                              std::string(e.what()));
@@ -122,13 +123,13 @@ void SeaControl::loadConfig(const std::string& config_file) {
   ecat_.status_word.name = ecat["status_word"].as<std::string>("Statusword");
   ecat_.control_word.name = ecat["control_word"].as<std::string>("Controlword");
   ecat_.mode_of_operation.name =
-      ecat["mode_of_operation"].as<std::string>("Mode of operation");
+      ecat["mode_of_operation"].as<std::string>("Modes of operation");
   ecat_.target_position.name =
-      ecat["target_position"].as<std::string>("Target Position");
+      ecat["target_position"].as<std::string>("Target position");
   ecat_.target_velocity.name =
-      ecat["target_velocity"].as<std::string>("Target Velocity");
+      ecat["target_velocity"].as<std::string>("Target velocity");
   ecat_.target_torque.name =
-      ecat["target_torque"].as<std::string>("Target Torque");
+      ecat["target_torque"].as<std::string>("Target torque");
 
   process_pdo_mapping();  // 处理PDO和共享内存变量关联
 
@@ -205,18 +206,21 @@ void SeaControl::start() {
 
   switch (work_mode_) {
     case WORK_MODE_POSITION:
+      spdlog::info("Set mode to Position Mode.");
       mode_ = ModeOfOperation::
           CyclicSynchronousPositionMode;  // 设置工作模式为位置模式
       setTargetPositionRaw(
           0, getActualPositionRaw(0));  // 设置目标位置为当前实际位置
       break;
     case WORK_MODE_VELOCITY:
+      spdlog::info("Set mode to Velocity Mode.");  
       mode_ = ModeOfOperation::
           CyclicSynchronousVelocityMode;  // 设置工作模式为速度模式
       setTargetVelocityRaw(0, 0);         // 设置目标速度为0
       break;
     case WORK_MODE_ZERO_FORCE:
     case WORK_MODE_IMPEDANCE:
+      spdlog::info("Set mode to Torque Mode.");
       mode_ = ModeOfOperation::
           CyclicSynchronousTorqueMode;  // 设置工作模式为力矩模式
       setTargetTorqueRaw(0, 0);         // 设置目标力矩为0
@@ -263,8 +267,11 @@ void SeaControl::stop() {
 }
 
 void SeaControl::init() {
-  if (is_guard_thread_running_)
-    return;  // 如果保护线程已经在运行，则不再启动新的线程
+  if(guard_thread_ && guard_thread_->joinable()) {
+    spdlog::warn("Guard thread is already running, stopping it first.");
+    is_guard_thread_running_ = false;
+    guard_thread_->join();
+  }
 
   is_guard_thread_running_ = true;
 
@@ -276,6 +283,8 @@ void SeaControl::init() {
 
       if (current_drive_state_ == DriveState::Fault) {
         sm.process_event(EventErrorOccurred{});
+        is_guard_thread_running_ = false;
+        return;
       }
 
       if (conduct_state_change_) engageStateMachine();
@@ -290,6 +299,7 @@ void SeaControl::reset() {}
 
 void SeaControl::impedance_handler() {
   while (sm.is(sml::state<class RUNNING>)) {
+    waitForSignal(0);  // 等待信号
   }
 
   spdlog::info("Exit impedance control loop.");
@@ -297,6 +307,7 @@ void SeaControl::impedance_handler() {
 
 void SeaControl::velocity_handler() {
   while (sm.is(sml::state<class RUNNING>)) {
+    waitForSignal(0);  // 等待信号
   }
 
   spdlog::info("Exit velocity control loop.");
@@ -304,6 +315,7 @@ void SeaControl::velocity_handler() {
 
 void SeaControl::position_handler() {
   while (sm.is(sml::state<class RUNNING>)) {
+    waitForSignal(0);  // 等待信号
   }
 
   spdlog::info("Exit position control loop.");
@@ -311,6 +323,7 @@ void SeaControl::position_handler() {
 
 void SeaControl::zero_force_handler() {
   while (sm.is(sml::state<class RUNNING>)) {
+    waitForSignal(0);  // 等待信号
   }
 
   spdlog::info("Exit zero force control loop.");
@@ -656,3 +669,19 @@ void SeaControl::Init() {
 void SeaControl::Run() { sm.process_event(EventStart_REQ{}); }
 void SeaControl::Stop() { sm.process_event(EventStop_REQ{}); }
 void SeaControl::Reset() { sm.process_event(EventReset_REQ{}); }
+std::string SeaControl::GetState() const {
+  if (sm.is(sml::state<class DISABLED>)) {
+    return "DISABLED";
+  } else if (sm.is(sml::state<class STOPPED>)) {
+    return "STOPPED";
+  } else if (sm.is(sml::state<class RUNNING>)) {
+    return "RUNNING";
+  } else if (sm.is(sml::state<class ERROR>)) {
+    return "ERROR";
+  } else if (sm.is(sml::state<class STARTING>)) {
+    return "STARTING";
+  } else if (sm.is(sml::state<class STOPPING>)) {
+    return "STOPPING";
+  }
+  return "UNKNOWN";
+}

@@ -165,21 +165,52 @@ std::ostream& operator<<(std::ostream& os, const Controlword& controlword) {
 }  // namespace rocos
 
 int main() {
-  auto* seaControl = new SeaControl("config/control.yml");
+  auto* seaControl = new SeaControl("sea_config.yml");
+
+  
+
+  std::cout << "State1: " << seaControl->GetState() << std::endl;
+
+
+  std::cout << "State2: " << seaControl->GetState() << std::endl;
+
+
+  usleep(1000000);  // 等待1秒钟
+
+  std::cout << "State3: " << seaControl->GetState() << std::endl;
+
 
   seaControl->Init();
 
   usleep(1000000);  // 等待1秒钟
 
+
+  // seaControl->Reset();
+
+  //   usleep(1000000);  // 等待1秒钟
+
+
+  std::cout << "State4: " << seaControl->GetState() << std::endl;
+
+
   seaControl->SetWorkMode(WORK_MODE_VELOCITY);
 
   seaControl->Run();
 
-  seaControl->SetVelocity(10.0);  // 设置速度为10.0 rpm
+  std::cout << "State6: " << seaControl->GetState() << std::endl;
+
+
+  seaControl->SetVelocity(4.0);  // 设置速度为10.0 rpm
 
   std::this_thread::sleep_for(std::chrono::seconds(5));  // 运行5秒钟
 
+  seaControl->SetVelocity(0.0);  // 设置速度为10.0 rpm
+
   seaControl->Stop();
+
+  while(1) {
+    usleep(1000000);  // 等待1秒钟
+  }
 
   //  std::cout << "Hello, World!" << std::endl;
   //

@@ -6,11 +6,11 @@ sea:
     status_word: "Statusword" # 状态字
     secondary_position_value: "Secondary position value" # 辅助位置值
     secondary_velocity_value: "Secondary velocity value" # 辅助速度值
-    mode_of_operation: "Mode of operation" # 操作模式
+    mode_of_operation: "Modes of operation" # 操作模式
     control_word: "Controlword" # 控制字
-    target_torque: "Target Torque" # 目标扭矩
-    target_position: "Target Position" # 目标位置
-    target_velocity: "Target Velocity" # 目标速度
+    target_torque: "Target torque" # 目标扭矩
+    target_position: "Target position" # 目标位置
+    target_velocity: "Target velocity" # 目标速度
   hardware:
     high_encoder_ppr: 262144 # 高速端分辨率 18bit
     low_encoder_ppr: 65536   # 低速端分辨率 14bit

@@ -68,6 +68,9 @@ class SeaControl {
     work_mode_ = mode;
   }
 
+  std::string GetState() const;
+
+
   void SetVelocity(double vel) { // 低速端 rpm
     int32_t order = vel * hw_.ratio; // Synapticon Target Velocity是高速端rpm
     setTargetVelocityRaw(0, order);
