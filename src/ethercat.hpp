@@ -4,9 +4,9 @@
 
 #pragma once
 
-#include <iostream>
 #include <cstdint>
 #include <iomanip>
+#include <iostream>
 
 namespace rocos {
 
@@ -22,7 +22,31 @@ enum class DriveState : uint8_t {
   NA
 };
 
-enum class StateTransition : uint8_t { _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _15 };
+enum class StateTransition : uint8_t {
+  _2,
+  _3,
+  _4,
+  _5,
+  _6,
+  _7,
+  _8,
+  _9,
+  _10,
+  _11,
+  _12,
+  _15
+};
+
+enum class ModeOfOperation : int8_t {
+  NA = 0,
+  ProfiledPositionMode = 1,
+  ProfiledVelocityMode = 3,
+  ProfiledTorqueMode = 4,
+  HomingMode = 6,
+  CyclicSynchronousPositionMode = 8,
+  CyclicSynchronousVelocityMode = 9,
+  CyclicSynchronousTorqueMode = 10
+};
 
 class Statusword {
  private:
@@ -42,7 +66,8 @@ class Statusword {
   uint16_t rawStatusword_{0};
 
  public:
-  friend std::ostream &operator<<(std::ostream &os, const Statusword &statusword);
+  friend std::ostream& operator<<(std::ostream& os,
+                                  const Statusword& statusword);
 
   void setFromRawStatusword(uint16_t status) {
     readyToSwitchOn_ = static_cast<bool>(status & 1 << (0));
@@ -82,7 +107,7 @@ class Statusword {
       driveState = DriveState::FaultReactionActive;
     } else if ((rawStatusword_ & 0b0000000001001111) == 0b0000000000001000) {
       driveState = DriveState::Fault;
-    }else {
+    } else {
       driveState = DriveState::Fault;
     }
 
@@ -120,96 +145,194 @@ class Statusword {
   }
 };
 
-std::ostream& operator<<(std::ostream& os, const Statusword& statusword) {
-  using std::setfill;
-  using std::setw;
-  std::string driveStateString = statusword.getDriveStateString();
-  int gapSize2 = driveStateString.size() + 1;
-  if (gapSize2 < 6) {
-    gapSize2 = 6;
+struct Controlword {
+  bool switchOn_{false};              // bit 0
+  bool enableVoltage_{false};         // bit 1
+  bool quickStop_{false};             // bit 2
+  bool enableOperation_{false};       // bit 3
+  bool newSetPoint_{false};           // bit 4 profiled position mode
+  bool homingOperationStart_{false};  // bit 4 homing mode
+  bool changeSetImmediately_{false};  // bit 5 profiled position mode
+  bool relative_{false};              // bit 6 profiled position mode
+  bool faultReset_{false};            // bit 7
+  bool halt_{false};                  // bit 8
+
+  void setFromRawControlword(uint16_t ctrlwd) {
+    switchOn_ = (ctrlwd >> 1) & 0x01;
+    enableVoltage_ = (ctrlwd >> 1) & 0x01;
+    quickStop_ = (ctrlwd >> 2) & 0x01;
+    enableOperation_ = (ctrlwd >> 3) & 0x01;
+    // 4, 5, 6 homing,pp specific = false
+    faultReset_ = (ctrlwd >> 7) & 0x01;
+    halt_ = (ctrlwd >> 8) & 0x01;
   }
-  os << std::left << std::boolalpha << setw(gapSize2 + 27) << setfill('-') << "|"
-     << "|\n"
-     << setw(gapSize2 + 27) << setfill(' ') << "| Statusword"
-     << "|\n"
-     << setw(gapSize2 + 27) << setfill('-') << "|"
-     << "|\n"
-     << setw(25) << setfill(' ') << "| Name of Bit" << setw(gapSize2 + 2) << "| Value"
-     << "|\n"
-     << setw(25) << setfill('-') << "|" << setw(gapSize2 + 2) << "+"
-     << "|\n"
-     << setfill(' ') <<
+  /*!
+   * get the control word as a 16 bit unsigned integer
+   * THIS DOES NOT RESPECT THE MODE SPECIFIC OPTIONS!
+   * The usually used cyclic modes do not need mode specific options.
+   * @return	the raw controlword
+   */
+  uint16_t getRawControlword() {
+    uint16_t rawControlword = 0;
 
-      setw(25) << "| Ready to switch on:"
-     << "| " << setw(gapSize2) << statusword.readyToSwitchOn_ << "|\n"
-     << setw(25) << "| Switched on:"
-     << "| " << setw(gapSize2) << statusword.switchedOn_ << "|\n"
-     << setw(25) << "| Operation enabled:"
-     << "| " << setw(gapSize2) << statusword.operationEnabled_ << "|\n"
-     << setw(25) << "| Fault:"
-     << "| " << setw(gapSize2) << statusword.fault_ << "|\n"
-     << setw(25) << "| Voltage enabled:"
-     << "| " << setw(gapSize2) << statusword.voltageEnabled_ << "|\n"
-     << setw(25) << "| Quick stop:"
-     << "| " << setw(gapSize2) << statusword.quickStop_ << "|\n"
-     << setw(25) << "| Switch on disabled:"
-     << "| " << setw(gapSize2) << statusword.switchOnDisabled_ << "|\n"
-     << setw(25) << "| Warning:"
-     << "| " << setw(gapSize2) << statusword.warning_ << "|\n"
-     << setw(25) << "| Target reached:"
-     << "| " << setw(gapSize2) << statusword.targetReached_ << "|\n"
-     << setw(25) << "| Internal limit active:"
-     << "| " << setw(gapSize2) << statusword.internalLimitActive_ << "|\n"
-     <<
-      // setw(25)<<"| Following error:"<<"|
-      // "<<setw(gapSize2)<<statusword.followingError_<<"| \n"<< // mode of
-      // operation specific
-      setw(25) << setfill('-') << "|" << setw(gapSize2 + 2) << "+"
-     << "|\n"
-     << setfill(' ') << setw(25) << "| Resulting Drive State:"
-     << "| " << setw(gapSize2) << driveStateString << "|\n"
-     << setw(25) << setfill('-') << "|" << setw(gapSize2 + 2) << "+"
-     << "|" <<
+    if (switchOn_) {
+      rawControlword |= (1 << 0);
+    }
+    if (enableVoltage_) {
+      rawControlword |= (1 << 1);
+    }
+    if (quickStop_) {
+      rawControlword |= (1 << 2);
+    }
+    if (enableOperation_) {
+      rawControlword |= (1 << 3);
+    }
+    if (faultReset_) {
+      rawControlword |= (1 << 7);
+    }
+    if (halt_) {
+      rawControlword |= (1 << 8);
+    }
 
-      std::noboolalpha << std::right << setfill(' ');
-
-  return os;
-}
-
-std::ostream& operator<<(std::ostream& os, const DriveState& driveState) {
-  switch (driveState) {
-    case rocos::DriveState::NotReadyToSwitchOn:
-      os << "NotReadyToSwitchOn";
-      break;
-    case rocos::DriveState::SwitchOnDisabled:
-      os << "SwitchOnDisabled";
-      break;
-    case rocos::DriveState::ReadyToSwitchOn:
-      os << "ReadyToSwitchOn";
-      break;
-    case rocos::DriveState::SwitchedOn:
-      os << "SwitchedOn";
-      break;
-    case rocos::DriveState::OperationEnabled:
-      os << "OperationEnabled";
-      break;
-    case rocos::DriveState::QuickStopActive:
-      os << "QuickStopActive";
-      break;
-    case rocos::DriveState::FaultReactionActive:
-      os << "FaultReactionActive";
-      break;
-    case rocos::DriveState::Fault:
-      os << "Fault";
-      break;
-    case rocos::DriveState::NA:
-      os << "NA";
-      break;
-
+    return rawControlword;
   }
-  return os;
-}
 
+  /*!
+   * State transition 2
+   * SWITCH ON DISABLED -> READY TO SWITCH ON
+   * This corresponds to a "shutdown" Controlword
+   */
+  void setStateTransition2() {
+    setAllFalse();
+    enableVoltage_ = true;
+    quickStop_ = true;
+  }
 
-}
+  /*!
+   * State transition 3
+   * READY TO SWITCH ON -> SWITCHED ON
+   * This corresponds to a "switch on" Controlword
+   */
+  void setStateTransition3() {
+    setAllFalse();
+    switchOn_ = true;
+    enableVoltage_ = true;
+    quickStop_ = true;
+  }
 
+  /*!
+   * State transition 4
+   * SWITCHED ON -> ENABLE OPERATION
+   */
+  void setStateTransition4() {
+    setAllFalse();
+    switchOn_ = true;
+    enableVoltage_ = true;
+    quickStop_ = true;
+    enableOperation_ = true;
+  }
+
+  /*!
+   * State transition 5
+   * OPERATION ENABLED -> SWITCHED ON
+   * This corresponds to a "disable operation" Controlword
+   */
+  void setStateTransition5() {
+    setAllFalse();
+    switchOn_ = true;
+    enableVoltage_ = true;
+    quickStop_ = true;
+  }
+
+  /*!
+   * State transition 6
+   * SWITCHED ON -> READY TO SWITCH ON
+   */
+  void setStateTransition6() {
+    setAllFalse();
+    enableVoltage_ = true;
+    quickStop_ = true;
+  }
+
+  /*!
+   * State transition 7
+   * READY TO SWITCH ON -> SWITCH ON DISABLED
+   */
+  void setStateTransition7() { setAllFalse(); }
+
+  /*!
+   * State transition 8
+   * OPERATION ENABLED -> READY TO SWITCH ON
+   */
+  void setStateTransition8() {
+    setAllFalse();
+    enableVoltage_ = true;
+    quickStop_ = true;
+  }
+
+  /*!
+   * State transition 9
+   * OPERATION ENABLED -> SWITCH ON DISABLED
+   * This resets the elmo to the same state as on hardware startup
+   * 0x0000
+   */
+  void setStateTransition9() { setAllFalse(); }
+
+  /*!
+   * State transition 10
+   * SWITCHED ON -> SWITCH ON DISABLED
+   * This Statusword is 0x0000
+   */
+  void setStateTransition10() { setAllFalse(); }
+
+  /*!
+   * State transition 11
+   * OPERATION ENABLED -> QUICK STOP ACTIVE
+   */
+  void setStateTransition11() {
+    setAllFalse();
+    enableVoltage_ = true;
+  }
+
+  /*!
+   * State transition 12
+   * QUICK STOP ACTIVE -> SWITCH ON DISABLED
+   */
+  void setStateTransition12() { setAllFalse(); }
+
+  /*!
+   * State transition 15
+   * FAULT -> SWITCH ON DISABLED
+   */
+  void setStateTransition15() {
+    setAllFalse();
+    faultReset_ = true;
+  }
+
+  /*!
+   * Sets all bools of this struct to false
+   */
+  void setAllFalse() {
+    switchOn_ = false;
+    enableVoltage_ = false;
+    quickStop_ = false;
+    enableOperation_ = false;
+    newSetPoint_ = false;
+    homingOperationStart_ = false;
+    changeSetImmediately_ = false;
+    relative_ = false;
+    faultReset_ = false;
+    halt_ = false;
+  }
+
+  /*!
+   * goes to the init state
+   * Alias for state transition 2
+   */
+  void setInit() { setStateTransition2(); }
+
+  friend std::ostream& operator<<(std::ostream& os,
+                                  const Controlword& controlword);
+};
+
+}  // namespace rocos

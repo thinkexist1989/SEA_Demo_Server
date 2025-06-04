@@ -45,6 +45,16 @@ const auto action_start = []() {
   seaControl->start();
 };
 
+const auto action_init = []() {
+  spdlog::info("Initializing.....");
+  seaControl->start();
+};
+
+const auto action_reset = []() {
+  spdlog::info("Resetting.....");
+  seaControl->reset();
+};
+
 // 状态机定义
 struct StateMachine {
   auto operator()() const noexcept {
@@ -53,6 +63,7 @@ struct StateMachine {
     return make_transition_table(
         // 初始状态
         *state<class DISABLED> + event<EventInit_REQ> = state<class STOPPED>,
+        state<class STOPPED> + sml::on_entry<_> / action_init,
         // 状态切换
         state<class STOPPED> + event<EventStart_REQ> = state<class STARTING>,
         state<class STARTING> + sml::on_entry<_> / action_start,
@@ -63,7 +74,8 @@ struct StateMachine {
         state<class STOPPING> + sml::on_entry<_> / action_stop,
         state<class STOPPING> + event<EventSuccess> = state<class STOPPED>,
 
-        state<class ERROR> + event<EventReset_REQ> = state<class DISABLED>,
+        state<class ERROR> + event<EventReset_REQ> / action_reset =
+            state<class DISABLED>,
 
         state<class RUNNING> + event<EventErrorOccurred> = state<class ERROR>,
         state<class STOPPED> + event<EventErrorOccurred> = state<class ERROR>,
@@ -190,21 +202,457 @@ void SeaControl::process_pdo_mapping() {
 
 void SeaControl::start() {
   // 这是主要是使能关节
+
+  switch (work_mode_) {
+    case WORK_MODE_POSITION:
+      mode_ = ModeOfOperation::
+          CyclicSynchronousPositionMode;  // 设置工作模式为位置模式
+      setTargetPositionRaw(
+          0, getActualPositionRaw(0));  // 设置目标位置为当前实际位置
+      break;
+    case WORK_MODE_VELOCITY:
+      mode_ = ModeOfOperation::
+          CyclicSynchronousVelocityMode;  // 设置工作模式为速度模式
+      setTargetVelocityRaw(0, 0);         // 设置目标速度为0
+      break;
+    case WORK_MODE_ZERO_FORCE:
+    case WORK_MODE_IMPEDANCE:
+      mode_ = ModeOfOperation::
+          CyclicSynchronousTorqueMode;  // 设置工作模式为力矩模式
+      setTargetTorqueRaw(0, 0);         // 设置目标力矩为0
+      break;
+    default:
+      break;
+  }
+
+  // 设置工作模式
+  setModeOfOperationRaw(0, static_cast<int8_t>(mode_));  // 设置工作模式
+
+  setDriverState(DriveState::OperationEnabled);  //
 }
 
 void SeaControl::run() {
   // 这里是主循环，处理不同的工作模式
+  switch (work_mode_) {
+    case WORK_MODE_IMPEDANCE:
+      run_thread_ =
+          std::make_shared<std::thread>(&SeaControl::impedance_handler, this);
+      break;
+    case WORK_MODE_ZERO_FORCE:
+      run_thread_ =
+          std::make_shared<std::thread>(&SeaControl::zero_force_handler, this);
+      break;
+    case WORK_MODE_POSITION:
+      run_thread_ =
+          std::make_shared<std::thread>(&SeaControl::position_handler, this);
+      break;
+    case WORK_MODE_VELOCITY:
+      run_thread_ =
+          std::make_shared<std::thread>(&SeaControl::velocity_handler, this);
+      break;
+    default:
+      spdlog::error("Unknown work mode: {}", work_mode_);
+      break;
+  }
 }
 
 void SeaControl::stop() {
   // 这里是停止运动，下使能
 
+  setDriverState(DriveState::SwitchOnDisabled);  // 下使能
 }
 
-void SeaControl::impedance_handler() {}
+void SeaControl::init() {
+  if (is_guard_thread_running_)
+    return;  // 如果保护线程已经在运行，则不再启动新的线程
 
-void SeaControl::velocity_handler() {}
+  is_guard_thread_running_ = true;
 
-void SeaControl::position_handler() {}
+  guard_thread_ = std::make_shared<std::thread>([=]() {
+    std::cout << "Drive Guard is running on thread "
+              << std::this_thread::get_id() << std::endl;
+    while (is_guard_thread_running_) {
+      current_drive_state_ = getDriverState(0);
 
-void SeaControl::zero_force_handler() {}
+      if (current_drive_state_ == DriveState::Fault) {
+        sm.process_event(EventErrorOccurred{});
+      }
+
+      if (conduct_state_change_) engageStateMachine();
+
+      usleep(10000);
+    }
+    std::cout << "Drive Guard thread is terminated." << std::endl;
+  });
+}
+
+void SeaControl::reset() {}
+
+void SeaControl::impedance_handler() {
+  while (sm.is(sml::state<class RUNNING>)) {
+  }
+
+  spdlog::info("Exit impedance control loop.");
+}
+
+void SeaControl::velocity_handler() {
+  while (sm.is(sml::state<class RUNNING>)) {
+  }
+
+  spdlog::info("Exit velocity control loop.");
+}
+
+void SeaControl::position_handler() {
+  while (sm.is(sml::state<class RUNNING>)) {
+  }
+
+  spdlog::info("Exit position control loop.");
+}
+
+void SeaControl::zero_force_handler() {
+  while (sm.is(sml::state<class RUNNING>)) {
+  }
+
+  spdlog::info("Exit zero force control loop.");
+}
+
+void SeaControl::setTargetPositionRaw(int id, int32_t pos) {
+  if (ecat_.target_position.p) *ecat_.target_position.p = pos;
+}
+
+void SeaControl::setTargetVelocityRaw(int id, int32_t vel) {
+  if (ecat_.target_velocity.p) *ecat_.target_velocity.p = vel;
+}
+
+void SeaControl::setTargetTorqueRaw(int id, int16_t tor) {
+  if (ecat_.target_torque.p) *ecat_.target_torque.p = tor;
+}
+
+int32_t SeaControl::getActualPositionRaw(int id) {
+  return ecat_.position_actual_value.p ? *ecat_.position_actual_value.p : 0;
+}
+
+int32_t SeaControl::getActualVelocityRaw(int id) {
+  return ecat_.velocity_actual_value.p ? *ecat_.velocity_actual_value.p : 0;
+}
+
+int16_t SeaControl::getActualTorqueRaw(int id) {
+  return ecat_.torque_actual_value.p ? *ecat_.torque_actual_value.p : 0;
+}
+
+int32_t SeaControl::getSecondaryPositionRaw(int id) {
+  return ecat_.secondary_position_value.p ? *ecat_.secondary_position_value.p
+                                          : 0;
+}
+
+int32_t SeaControl::getSecondaryVelocityRaw(int id) {
+  return ecat_.secondary_velocity_value.p ? *ecat_.secondary_velocity_value.p
+                                          : 0;
+}
+
+uint16_t SeaControl::getStatuswordRaw(int id) {
+  return ecat_.status_word.p ? *ecat_.status_word.p : 0;
+}
+
+void SeaControl::setControlwordRaw(int id, uint16_t ctrlwd) {
+  if (ecat_.control_word.p) *ecat_.control_word.p = ctrlwd;
+}
+
+void SeaControl::setModeOfOperationRaw(int id, int8_t mode) {
+  if (ecat_.mode_of_operation.p) *ecat_.mode_of_operation.p = mode;
+}
+
+void SeaControl::waitForSignal(int id) { ecat_cfg_->waitForSignal(id); }
+
+Controlword SeaControl::getNextStateTransitionControlword(
+    const DriveState& requestedDriveState,
+    const DriveState& currentDriveState) {
+  Controlword controlword;
+  controlword.setAllFalse();
+  switch (requestedDriveState) {
+    case DriveState::SwitchOnDisabled:
+      switch (currentDriveState) {
+        case DriveState::SwitchOnDisabled:
+          std::cerr << "[rocos::Drive::getNextStateTransitionControlword] "
+                    << "drive state has already been reached" << name_ << "'"
+                    << std::endl;
+          //                        MELO_ERROR_STREAM("[elmo_ethercat_sdk:Elmo::getNextStateTransitionControlword]
+          //                        "
+          //                                                  << "drive state
+          //                                                  has already been
+          //                                                  reached for '"
+          //                                                  << name_ << "'");
+          //                        addErrorToReading(ErrorType::PdoStateTransitionError);
+          break;
+        case DriveState::ReadyToSwitchOn:
+          controlword.setStateTransition7();
+          break;
+        case DriveState::SwitchedOn:
+          controlword.setStateTransition10();
+          break;
+        case DriveState::OperationEnabled:
+          controlword.setStateTransition9();
+          break;
+        case DriveState::QuickStopActive:
+          controlword.setStateTransition12();
+          break;
+        case DriveState::Fault:
+          controlword.setStateTransition15();
+          break;
+        default:
+          std::cerr << "[rocos::Drive::getNextStateTransitionControlword] "
+                    << "PDO state transition not implemented for '" << name_
+                    << "'" << std::endl;
+          //                        MELO_ERROR_STREAM("[elmo_ethercat_sdk:Elmo::getNextStateTransitionControlword]
+          //                        "
+          //                                                  <<
+          //                                                  << name_ << "'");
+          //                        addErrorToReading(ErrorType::PdoStateTransitionError);
+      }
+      break;
+
+    case DriveState::ReadyToSwitchOn:
+      switch (currentDriveState) {
+        case DriveState::SwitchOnDisabled:
+          controlword.setStateTransition2();
+          break;
+        case DriveState::ReadyToSwitchOn:
+          std::cerr << "[rocos::Drive::getNextStateTransitionControlword] "
+                    << "drive state has already been reached for '" << name_
+                    << "'" << std::endl;
+          break;
+        case DriveState::SwitchedOn:
+          controlword.setStateTransition6();
+          break;
+        case DriveState::OperationEnabled:
+          controlword.setStateTransition8();
+          break;
+        case DriveState::QuickStopActive:
+          controlword.setStateTransition12();
+          break;
+        case DriveState::Fault:
+          controlword.setStateTransition15();
+          break;
+        default:
+          std::cerr << "[rocos::Drive::getNextStateTransitionControlword] "
+                    << "PDO state transition not implemented for '" << name_
+                    << "'" << std::endl;
+      }
+      break;
+
+    case DriveState::SwitchedOn:
+      switch (currentDriveState) {
+        case DriveState::SwitchOnDisabled:
+          controlword.setStateTransition2();
+          break;
+        case DriveState::ReadyToSwitchOn:
+          controlword.setStateTransition3();
+          break;
+        case DriveState::SwitchedOn:
+          std::cerr << "[rocos::Drive::getNextStateTransitionControlword] "
+                    << "drive state has already been reached for '" << name_
+                    << "'" << std::endl;
+          break;
+        case DriveState::OperationEnabled:
+          controlword.setStateTransition5();
+          break;
+        case DriveState::QuickStopActive:
+          controlword.setStateTransition12();
+          break;
+        case DriveState::Fault:
+          controlword.setStateTransition15();
+          break;
+        default:
+          std::cerr << "[rocos::Drive::getNextStateTransitionControlword] "
+                    << "PDO state transition not implemented for '" << name_
+                    << "'" << std::endl;
+      }
+      break;
+
+    case DriveState::OperationEnabled:
+      switch (currentDriveState) {
+        case DriveState::SwitchOnDisabled:
+          controlword.setStateTransition2();
+          break;
+        case DriveState::ReadyToSwitchOn:
+          controlword.setStateTransition3();
+          break;
+        case DriveState::SwitchedOn:
+          controlword.setStateTransition4();
+          break;
+        case DriveState::OperationEnabled:
+          std::cerr << "[rocos::Drive::getNextStateTransitionControlword] "
+                    << "drive state has already been reached for '" << name_
+                    << "'" << std::endl;
+          break;
+        case DriveState::QuickStopActive:
+          controlword.setStateTransition12();
+          break;
+        case DriveState::Fault:
+          controlword.setStateTransition15();
+          break;
+        default:
+          std::cerr << "[rocos::Drive::getNextStateTransitionControlword] "
+                    << "PDO state transition not implemented for '" << name_
+                    << "'" << std::endl;
+      }
+      break;
+
+    case DriveState::QuickStopActive:
+      switch (currentDriveState) {
+        case DriveState::SwitchOnDisabled:
+          controlword.setStateTransition2();
+          break;
+        case DriveState::ReadyToSwitchOn:
+          controlword.setStateTransition3();
+          break;
+        case DriveState::SwitchedOn:
+          controlword.setStateTransition4();
+          break;
+        case DriveState::OperationEnabled:
+          controlword.setStateTransition11();
+          break;
+        case DriveState::QuickStopActive:
+          std::cerr << "[rocos::Drive::getNextStateTransitionControlword] "
+                    << "drive state has already been reached for '" << name_
+                    << "'" << std::endl;
+          break;
+        case DriveState::Fault:
+          controlword.setStateTransition15();
+          break;
+        default:
+          std::cerr << "[rocos::Drive::getNextStateTransitionControlword] "
+                    << "PDO state transition not implemented for '" << name_
+                    << "'" << std::endl;
+      }
+      break;
+
+    default:
+      std::cerr << "[rocos::Drive::getNextStateTransitionControlword] "
+                << "PDO state cannot be reached for '" << name_ << "'"
+                << std::endl;
+  }
+
+  return controlword;
+}
+
+void SeaControl::engageStateMachine() {
+  // elapsed time since the last new controlword
+  auto microsecondsSinceChange =
+      (std::chrono::duration_cast<std::chrono::microseconds>(
+           std::chrono::system_clock::now() - drive_state_change_time_point_))
+          .count();
+
+  // get the current state
+  // since we wait until "hasRead" is true, this is guaranteed to be a newly
+  // read value
+  //        const DriveState currentDriveState = reading_.getDriveState();
+
+  // check if the state change already was successful:
+  if (current_drive_state_ == target_drive_state_) {
+    num_of_successful_target_state_readings_++;
+    //            if (numberOfSuccessfulTargetStateReadings_ >=
+    //            configuration_.minNumberOfSuccessfulTargetStateReadings) {
+    if (num_of_successful_target_state_readings_ >= 3) {
+      // disable the state machine
+      conduct_state_change_ = false;
+      num_of_successful_target_state_readings_ = 0;
+      state_change_successful_ = true;
+
+      sm.process_event(EventSuccess{});
+
+      return;
+    }
+  } else if (microsecondsSinceChange > 20000) {
+    // get the next controlword from the state machine
+    controlword_ = getNextStateTransitionControlword(target_drive_state_,
+                                                     current_drive_state_);
+    drive_state_change_time_point_ = std::chrono::system_clock::now();
+    setControlwordRaw(0, controlword_.getRawControlword());  // set control word
+  }
+}
+
+bool SeaControl::setDriverState(const DriveState& driveState,
+                                bool waitForState) {
+  bool success = false;
+  /*
+   ** locking the mutex_
+   ** This is not done with a lock_guard here because during the waiting time
+   *the
+   ** mutex_ must be unlocked periodically such that PDO writing (and thus state
+   ** changes) may occur at all!
+   */
+  //        mutex_.lock();
+
+  // reset the "stateChangeSuccessful_" flag to false such that a new successful
+  // state change can be detected
+  state_change_successful_ = false;
+
+  // make the state machine realize that a state change will have to happen
+  conduct_state_change_ = true;
+
+  // overwrite the target drive state
+  target_drive_state_ = driveState;
+
+  // set the hasRead flag to false such that at least one new reading will be
+  // available when starting the state change
+  //        hasRead_ = false;
+
+  // set the time point of the last pdo change to now
+  drive_state_change_time_point_ = std::chrono::system_clock::now();
+
+  // set a temporary time point to prevent getting caught in an infinite loop
+  auto driveStateChangeStartTimePoint = std::chrono::system_clock::now();
+
+  // return if no waiting is requested
+  if (!waitForState) {
+    // unlock the mutex
+    //            mutex_.unlock();
+    // return true if no waiting is requested
+    return true;
+  }
+
+  // Wait for the state change to be successful
+  // during the waiting time the mutex MUST be unlocked!
+
+  while (true) {
+    // break loop as soon as the state change was successful
+    if (state_change_successful_) {
+      success = true;
+      break;
+    }
+
+    // break the loop if the state change takes too long
+    // this prevents a freezing of the end user's program if the hardware is not
+    // able to change it's state.
+    auto duration_us = std::chrono::duration_cast<std::chrono::microseconds>(
+        std::chrono::system_clock::now() - driveStateChangeStartTimePoint);
+    if (duration_us.count() >
+        150000) {  // wait for 100ms  TODO:
+                   // configuration_.driveStateChangeMaxTimeout
+      std::cout << "It takes too long (" << duration_us.count() / 1000.0
+                << " ms) to switch state!" << std::endl;
+      break;
+    }
+    // unlock the mutex during sleep time
+    //            mutex_.unlock();
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    // lock the mutex to be able to check the success flag
+    //            mutex_.lock();
+  }
+  // unlock the mutex one last time
+  //        mutex_.unlock();
+  return success;
+}
+
+DriveState SeaControl::getDriverState(int id) {
+  Statusword status;
+  status.setFromRawStatusword(getStatuswordRaw(id));
+  return status.getDriveState();
+}
+void SeaControl::Init() {
+  sm.process_event(EventInit_REQ{});  // 触发初始化事件
+}
+void SeaControl::Run() { sm.process_event(EventStart_REQ{}); }
+void SeaControl::Stop() { sm.process_event(EventStop_REQ{}); }
+void SeaControl::Reset() { sm.process_event(EventReset_REQ{}); }
