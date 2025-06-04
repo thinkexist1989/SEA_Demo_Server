@@ -9,6 +9,15 @@
 #include "sea.pb.h"
 #include "sea_control.hpp"
 
+bool isRunning = true;
+
+void signalHandler(int signum) {
+  std::cout << "Interrupt signal (" << signum << ") received.\n";
+  isRunning = false;
+}
+
+}  // namespace
+
 using namespace rocos;
 
 namespace rocos {
@@ -164,41 +173,32 @@ std::ostream& operator<<(std::ostream& os, const Controlword& controlword) {
 
 }  // namespace rocos
 
-int main() {
+void test_velocity() {
   auto* seaControl = new SeaControl("sea_config.yml");
-
-  
 
   std::cout << "State1: " << seaControl->GetState() << std::endl;
 
-
   std::cout << "State2: " << seaControl->GetState() << std::endl;
-
 
   usleep(1000000);  // 等待1秒钟
 
   std::cout << "State3: " << seaControl->GetState() << std::endl;
 
-
   seaControl->Init();
 
   usleep(1000000);  // 等待1秒钟
-
 
   // seaControl->Reset();
 
   //   usleep(1000000);  // 等待1秒钟
 
-
   std::cout << "State4: " << seaControl->GetState() << std::endl;
-
 
   seaControl->SetWorkMode(WORK_MODE_VELOCITY);
 
   seaControl->Run();
 
   std::cout << "State6: " << seaControl->GetState() << std::endl;
-
 
   seaControl->SetVelocity(4.0);  // 设置速度为10.0 rpm
 
@@ -208,10 +208,12 @@ int main() {
 
   seaControl->Stop();
 
-  while(1) {
+  while (1) {
     usleep(1000000);  // 等待1秒钟
   }
+}
 
+void test_zmq() {
   //  std::cout << "Hello, World!" << std::endl;
   //
   //  zmq::context_t context(1);
@@ -244,4 +246,68 @@ int main() {
   //  }
   //
   //  return 0;
+}
+
+void zmq_server(SeaControl* seaControl) {
+  zmq::context_t context(1);
+  zmq::socket_t socket(context, zmq::socket_type::req);
+  socket.bind("tcp://*:6060");
+
+  while (isRunning) {
+    zmq::message_t request;
+    socket.recv(request, zmq::recv_flags::none);
+
+    sea::ControlCommand control_command;
+    if (!control_command.ParseFromArray(request.data(), request.size())) {
+      std::cerr << "Failed to parse ControlCommand." << std::endl;
+      continue;
+    }
+
+    // 解析接收到的消息
+    sea::ConfigFeedback feedback;
+
+    if (control_command.has_enable()) {
+      
+//      control_command.enable().enable()
+    } else if (control_command.has_get_config()) {
+    } else if (control_command.has_get_status()) {
+    } else if (control_command.has_set_damping()) {
+    } else if (control_command.has_set_position()) {
+    } else if (control_command.has_set_stiffness()) {
+    } else if (control_command.has_set_velocity()) {
+    } else if (control_command.has_set_work_mode()) {
+    } else {
+      std::cerr << "Unknown command received." << std::endl;
+      continue;
+    }
+
+
+  }
+}
+
+int main() {
+  // 注册信号处理函数
+  signal(SIGINT, signalHandler);
+
+  std::cout << "ROCOS SEA Application" << std::endl;
+
+  auto* seaControl = new SeaControl("sea_config.yml");
+
+  // 启动ZMQ服务器线程
+  std::thread zmqThread(zmq_server, seaControl);
+
+  // 监测处理键盘输入
+  while (isRunning) {
+    std::string input;
+    std::cout << "Enter command (v, p, i, z): ";
+    std::getline(std::cin, input);
+
+    if (input == "v") {
+    } else if (input == "p") {
+    } else if (input == "i") {
+    } else if (input == "z") {
+    } else {
+      std::cout << "Unknown command: " << input << std::endl;
+    }
+  }
 }

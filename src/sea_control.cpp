@@ -62,7 +62,8 @@ struct StateMachine {
 
     return make_transition_table(
         // 初始状态
-        *state<class DISABLED> + event<EventInit_REQ> / action_init = state<class STOPPED>,
+        *state<class DISABLED> + event<EventInit_REQ> / action_init =
+            state<class STOPPED>,
         // state<class STOPPED> + sml::on_entry<_> / action_init,
         // 状态切换
         state<class STOPPED> + event<EventStart_REQ> = state<class STARTING>,
@@ -213,7 +214,7 @@ void SeaControl::start() {
           0, getActualPositionRaw(0));  // 设置目标位置为当前实际位置
       break;
     case WORK_MODE_VELOCITY:
-      spdlog::info("Set mode to Velocity Mode.");  
+      spdlog::info("Set mode to Velocity Mode.");
       mode_ = ModeOfOperation::
           CyclicSynchronousVelocityMode;  // 设置工作模式为速度模式
       setTargetVelocityRaw(0, 0);         // 设置目标速度为0
@@ -267,7 +268,7 @@ void SeaControl::stop() {
 }
 
 void SeaControl::init() {
-  if(guard_thread_ && guard_thread_->joinable()) {
+  if (guard_thread_ && guard_thread_->joinable()) {
     spdlog::warn("Guard thread is already running, stopping it first.");
     is_guard_thread_running_ = false;
     guard_thread_->join();
@@ -283,8 +284,8 @@ void SeaControl::init() {
 
       if (current_drive_state_ == DriveState::Fault) {
         sm.process_event(EventErrorOccurred{});
-        is_guard_thread_running_ = false;
-        return;
+        //        is_guard_thread_running_ = false;
+        //        return;
       }
 
       if (conduct_state_change_) engageStateMachine();
@@ -295,7 +296,13 @@ void SeaControl::init() {
   });
 }
 
-void SeaControl::reset() {}
+void SeaControl::reset() {
+  setTargetPositionRaw(0,
+                       getActualPositionRaw(0));  // 设置目标位置为当前实际位置
+  setTargetVelocityRaw(0, 0);                     // 设置目标速度为0
+  setTargetTorqueRaw(0, 0);                       // 设置目标力矩为0
+  setDriverState(DriveState::SwitchOnDisabled);
+}
 
 void SeaControl::impedance_handler() {
   while (sm.is(sml::state<class RUNNING>)) {
@@ -416,11 +423,6 @@ Controlword SeaControl::getNextStateTransitionControlword(
           std::cerr << "[rocos::Drive::getNextStateTransitionControlword] "
                     << "PDO state transition not implemented for '" << name_
                     << "'" << std::endl;
-          //                        MELO_ERROR_STREAM("[elmo_ethercat_sdk:Elmo::getNextStateTransitionControlword]
-          //                        "
-          //                                                  <<
-          //                                                  << name_ << "'");
-          //                        addErrorToReading(ErrorType::PdoStateTransitionError);
       }
       break;
 

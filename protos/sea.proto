@@ -42,8 +42,42 @@ message ControlFeedback {
   oneof feedback {
     StatusFeedback status = 1;
     ConfigFeedback config = 2;
+    SetStiffnessFeedback set_stiffness = 3;
+    SetDampingFeedback set_damping = 4;
+    SetWorkModeFeedback set_work_mode = 5;
+    EnableFeedback enable = 6;
+    SetPositionFeedback set_position = 7;
+    SetVelocityFeedback set_velocity = 8;
   }
 }
+
+message SetStiffnessFeedback {
+  double stiffness = 1; // in N/m
+}
+
+message SetDampingFeedback {
+  double damping = 1; // in N/(m/s)
+}
+
+message SetWorkModeFeedback {
+  WorkMode work_mode = 1;
+}
+
+message EnableFeedback {
+  bool enabled = 1;
+}
+
+message SetPositionFeedback {
+  double position = 1; // in radians
+}
+
+message SetVelocityFeedback {
+  double velocity = 1; // in radians per second
+}
+
+
+
+
 
 message GetStatusCommand {
   // This command does not require any parameters.
