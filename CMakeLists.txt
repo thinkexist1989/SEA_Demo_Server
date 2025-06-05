@@ -30,3 +30,9 @@ target_link_libraries(server PUBLIC cppzmq protobuf::libprotobuf sml::sml spdlog
 
 file(COPY config/sea_config.yml
      DESTINATION ${CMAKE_BINARY_DIR})
+
+enable_testing()
+add_executable(unit_test test/unit_test.cpp ${PROTO_SRCS} ${PROTO_HDRS})
+target_include_directories(unit_test PUBLIC ${Protobuf_INCLUDE_DIRS} ${CMAKE_CURRENT_BINARY_DIR})
+target_link_libraries(unit_test PUBLIC cppzmq protobuf::libprotobuf sml::sml spdlog::spdlog rocos::ecat_config tinyxml2::tinyxml2 yaml-cpp::yaml-cpp)
+add_test(NAME unit_test COMMAND unit_test)

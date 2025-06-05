@@ -343,6 +343,8 @@ int main() {
   std::cout << "ROCOS SEA Application" << std::endl;
 
   auto* seaControl = new SeaControl("sea_config.yml");
+  seaControl->Init();  // 初始化到Disable状态
+
 
   // 启动ZMQ服务器线程
   std::thread zmqThread(zmq_server, seaControl);
