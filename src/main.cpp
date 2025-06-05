@@ -250,7 +250,7 @@ void test_zmq() {
 
 void zmq_server(SeaControl* seaControl) {
   zmq::context_t context(1);
-  zmq::socket_t socket(context, zmq::socket_type::req);
+  zmq::socket_t socket(context, zmq::socket_type::rep);
   socket.bind("tcp://*:6060");
 
   while (isRunning) {
