@@ -6,6 +6,8 @@
 
 #include <boost/sml.hpp>
 
+#define CYCLE_TIME 0.001
+
 using namespace rocos;
 
 namespace {
@@ -144,6 +146,9 @@ void SeaControl::loadConfig(const std::string& config_file) {
   hw_.ratio = hw["ratio"].as<double>(100.0);
   hw_.spring_stiffness = hw["spring_stiffness"].as<double>(126.0507);
 
+  cnt_per_rad_high_ = hw_.high_encoder_ppr * hw_.ratio / (2 * M_PI);
+  cnt_per_rad_low_  = hw_.low_encoder_ppr / (2 * M_PI);
+
   if (!config_["impedance"]) {
     spdlog::error("Can not find [impedance] TAG. ");
   }
@@ -156,7 +161,9 @@ void SeaControl::loadConfig(const std::string& config_file) {
 void SeaControl::saveConfig(const std::string& config_file) const {
   try {
     YAML::Emitter out;
-    out << config_;
+    YAML::Node node;
+    node["sea"] = config_;
+    out << node;
     std::ofstream fout(config_file);
     fout << out.c_str();
     fout.close();
@@ -305,7 +312,74 @@ void SeaControl::reset() {
 }
 
 void SeaControl::impedance_handler() {
+
+  double inner_rad = 0.0;
+  double outer_rad = 0.0;
+  double target_torque = 0.0;
+
+  int offset_cnt_high{0}; // 高速端cnt offset
+  int offset_cnt_low{0}; // 低速端cnt offset
+
+  int is_first = 0; // 阻抗模式使用
+  double pos = 0.0;
+  double last_pos = 0.0;
+  double vel = 0.0;
+  double offset_torque = 0.0; // 阻抗模式使用
+  double last_offset_torque = 0.0; // 阻抗模式使用
+  double vel_torque = 0.0; // 阻抗模式使用
+
+  double command_torque = 0.0; // 阻抗模式使用
+
   while (sm.is(sml::state<class RUNNING>)) {
+
+    // 更新所需数据
+    int cur_pos_high = getActualPositionRaw(0); // 高速端 pos(cnt)
+    int cur_vel_high = getActualVelocityRaw(0); // 高速端 vel(rpm?)
+    int cur_tor_high = getActualTorqueRaw(0);   // 高速端 torque(1/1000 * 57)
+
+    int cur_pos_low = getSecondaryPositionRaw(0); // 低速端 pos(cnt)
+    int cur_vel_low = getSecondaryVelocityRaw(0); // 低速端 vel(rpm)
+
+    if (is_first < 5)
+    {
+      // 首次进入初始化
+      offset_cnt_high = cur_pos_high; // 以刚启动的位置作为初始位置
+      offset_cnt_low = cur_pos_low;
+
+      // filter.setup(3, sampleRate, cutoff_freq);
+
+      is_first++; // 取消进入
+    }
+
+    inner_rad = hw_.high_sign * (cur_pos_high - offset_cnt_high) / cnt_per_rad_high_; // 扭簧内圈弧度
+    outer_rad = hw_.low_sign * (cur_pos_low - offset_cnt_low) / cnt_per_rad_low_;    // 扭簧外圈弧度
+
+    double delta_rad = outer_rad - inner_rad;      // 内外圈弧度差值
+    double sensor_torque = -delta_rad * hw_.spring_stiffness; // 检测到的外力矩
+
+    pos = inner_rad; // 以外圈编码器作为最终位置
+    vel = (pos - last_pos) / CYCLE_TIME;
+
+    target_torque = -(pos * imp_.stiffness + vel * imp_.damping); // 目标力矩
+
+    offset_torque = target_torque - sensor_torque;
+    vel_torque = (offset_torque - last_offset_torque);
+
+    command_torque = target_torque + (15 * offset_torque + 3.5 * vel_torque);
+
+    if (std::abs(command_torque) > 57)
+    {
+      command_torque = command_torque > 0 ? 57 : -57;
+    }
+
+    int send_torque_value = command_torque / 57.0 * 1000;
+
+    setTargetTorqueRaw(0, send_torque_value);
+
+    last_pos = pos;
+    last_offset_torque = offset_torque;
+
+
     waitForSignal(0);  // 等待信号
   }
 
@@ -687,3 +761,34 @@ std::string SeaControl::GetState() const {
   }
   return "UNKNOWN";
 }
+RunState SeaControl::GetRunState() const {
+  if (sm.is(sml::state<class DISABLED>)) {
+    return DISABLED;
+  } else if (sm.is(sml::state<class STOPPED>)) {
+    return STOPPED;
+  } else if (sm.is(sml::state<class RUNNING>)) {
+    return RUNNING;
+  } else if (sm.is(sml::state<class ERROR>)) {
+    return ERROR;
+  } else if (sm.is(sml::state<class STARTING>)) {
+    return STARTING;
+  } else if (sm.is(sml::state<class STOPPING>)) {
+    return STOPPING;
+  } else {
+    return UNKNOWN;
+  }
+}
+double SeaControl::GetCurrentPosition() {
+  return getActualPositionRaw(0) / cnt_per_rad_high_;
+}
+
+double SeaControl::GetCurrentVelocity() { // rad/s
+  return getActualVelocityRaw(0) / hw_.ratio / rad2rpm;
+}
+
+//bool SeaControl::SetEnable(bool enable) {
+//  if (enable)
+//    return setDriverState(DriveState::OperationEnabled);
+//  else
+//    return setDriverState(DriveState::SwitchOnDisabled);
+//}

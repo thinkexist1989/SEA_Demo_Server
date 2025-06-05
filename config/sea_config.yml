@@ -16,6 +16,8 @@ sea:
     low_encoder_ppr: 65536   # 低速端分辨率 14bit
     ratio: 100               #减速比100:1
     spring_stiffness: 126.0507 # 扭簧刚度 2.2Nm/° = 126.0507 Nm/rad
+    high_sign: 1.0 # 高速端正方向
+    low_sign: 1.0 # 低速端正方向
   impedance:
     stiffness: 7.0 # 弹簧刚度
     damping: 0.5   # 阻尼系数

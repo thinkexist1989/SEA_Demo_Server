@@ -27,3 +27,6 @@ add_executable(server
         ${PROTO_SRCS} ${PROTO_HDRS})
 target_include_directories(server PUBLIC ${Protobuf_INCLUDE_DIRS} ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(server PUBLIC cppzmq protobuf::libprotobuf sml::sml spdlog::spdlog rocos::ecat_config tinyxml2::tinyxml2 yaml-cpp::yaml-cpp)
+
+file(COPY config/sea_config.yml
+     DESTINATION ${CMAKE_BINARY_DIR})

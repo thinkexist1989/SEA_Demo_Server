@@ -16,7 +16,7 @@ void signalHandler(int signum) {
   isRunning = false;
 }
 
-}  // namespace
+  // namespace
 
 using namespace rocos;
 
@@ -264,22 +264,73 @@ void zmq_server(SeaControl* seaControl) {
     }
 
     // 解析接收到的消息
-    sea::ConfigFeedback feedback;
+    sea::ControlFeedback feedback;
 
-    if (control_command.has_enable()) {
-      
-//      control_command.enable().enable()
+    if (control_command.has_stop()) {
+      seaControl->Stop();
+      feedback.mutable_stop()->set_stop(true);
+
     } else if (control_command.has_get_config()) {
+      auto* config = feedback.mutable_config();
+      config->set_encoder1_resolution(seaControl->hw_.high_encoder_ppr);
+      config->set_encoder2_resolution(seaControl->hw_.low_encoder_ppr);
+      config->set_spring_stiffness(seaControl->hw_.spring_stiffness);
+
     } else if (control_command.has_get_status()) {
-    } else if (control_command.has_set_damping()) {
-    } else if (control_command.has_set_position()) {
-    } else if (control_command.has_set_stiffness()) {
+      auto* status = feedback.mutable_status();
+      status->set_run_state(
+          static_cast<sea::RunState>(seaControl->GetRunState()));
+      status->set_work_mode(
+          static_cast<sea::WorkMode>(seaControl->GetWorkMode()));
+      status->set_stiffness(seaControl->imp_.stiffness);
+      status->set_damping(seaControl->imp_.damping);
+      status->set_current_position(seaControl->GetCurrentPosition());
+      status->set_current_velocity(seaControl->GetCurrentVelocity());
+
     } else if (control_command.has_set_velocity()) {
+      double velocity = control_command.set_velocity().velocity();
+      seaControl->SetVelocity(velocity);
+      feedback.mutable_set_velocity()->set_velocity(velocity);
+
+    } else if (control_command.has_set_position()) {
+      double position = control_command.set_position().position();
+      seaControl->SetPosition(position);
+      feedback.mutable_set_position()->set_position(position);
+
+    } else if (control_command.has_set_damping()) {
+      double damping = control_command.set_damping().damping();
+      seaControl->SetDamping(damping);
+      feedback.mutable_set_damping()->set_damping(damping);
+
+    } else if (control_command.has_set_stiffness()) {
+      double stiffness = control_command.set_stiffness().stiffness();
+      seaControl->SetStiffness(stiffness);
+      feedback.mutable_set_stiffness()->set_stiffness(stiffness);
+
     } else if (control_command.has_set_work_mode()) {
+      seaControl->Stop();
+//      usleep(200000);  // 等待200毫秒以确保停止完成
+
+      auto work_mode = control_command.set_work_mode().work_mode();
+      seaControl->SetWorkMode(work_mode);
+
+      seaControl->Run();
+
     } else {
       std::cerr << "Unknown command received." << std::endl;
       continue;
     }
+
+    std::string serialized;
+    if (!feedback.SerializeToString(&serialized)) {
+      std::cerr << "Failed to serialize statusFeedback." << std::endl;
+      continue;
+    }
+
+    zmq::message_t msg(serialized.size());
+    memcpy(msg.data(), serialized.data(), serialized.size());
+
+    socket.send(msg, zmq::send_flags::none);
 
 
   }

@@ -8,6 +8,8 @@ enum RunState {
   RUNNING = 2;
   UNKNOWN = 3;
   ERROR = 4;
+  STARTING = 5;
+  STOPPING = 6;
 }
 
 enum WorkMode {
@@ -35,7 +37,7 @@ message StatusFeedback {
 message ConfigFeedback {
   int32 encoder1_resolution = 1; // in counts
   int32 encoder2_resolution = 2; // in counts
-  int32 spring_stiffness = 3; // in N/m
+  double spring_stiffness = 3; // in N/m
 }
 
 message ControlFeedback {
@@ -45,7 +47,7 @@ message ControlFeedback {
     SetStiffnessFeedback set_stiffness = 3;
     SetDampingFeedback set_damping = 4;
     SetWorkModeFeedback set_work_mode = 5;
-    EnableFeedback enable = 6;
+    StopFeedback stop = 6;
     SetPositionFeedback set_position = 7;
     SetVelocityFeedback set_velocity = 8;
   }
@@ -63,8 +65,8 @@ message SetWorkModeFeedback {
   WorkMode work_mode = 1;
 }
 
-message EnableFeedback {
-  bool enabled = 1;
+message StopFeedback {
+  bool stop = 1;
 }
 
 message SetPositionFeedback {
@@ -99,8 +101,7 @@ message SetWorkModeCommand {
   WorkMode work_mode = 1;
 }
 
-message EnableCommand {
-  bool enable = 1;
+message StopCommand {
 }
 
 message SetPositionCommand {
@@ -115,8 +116,8 @@ message ControlCommand {
   oneof command {
     SetStiffnessCommand set_stiffness = 1;
     SetDampingCommand set_damping = 2;
-    SetWorkModeCommand set_work_mode = 3;
-    EnableCommand enable = 4;
+    SetWorkModeCommand set_work_mode = 3; // 设置工作模式，同时会进入Running状态
+    StopCommand stop = 4;  // 其实就是stopped状态
     SetPositionCommand set_position = 5;
     SetVelocityCommand set_velocity = 6;
     GetStatusCommand get_status = 7;

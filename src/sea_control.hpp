@@ -19,9 +19,24 @@
 #define WORK_MODE_POSITION 2
 #define WORK_MODE_VELOCITY 3
 
-
-
 namespace rocos {
+
+enum RunState {
+  DISABLED = 0,
+  STOPPED = 1,
+  RUNNING = 2,
+  UNKNOWN = 3,
+  ERROR = 4,
+  STARTING = 5,
+  STOPPING = 6
+};
+
+enum WorkMode {
+  IMPEDANCE = 0,
+  ZERO_FORCE = 1,
+  POSITION = 2,
+  VELOCITY = 3,
+};
 
 template <typename T>
 struct PdoEntry {
@@ -48,6 +63,8 @@ struct Hardware {
   int low_encoder_ppr{65536};
   double ratio{100.0};
   double spring_stiffness{126.0507};
+  int high_sign {1};
+  int low_sign {1};
 };
 
 struct Impedance {
@@ -59,10 +76,12 @@ class SeaControl {
  public:
   explicit SeaControl(const std::string& config_file);
 
-  void Init();
-  void Run();
-  void Stop();
+  void Init();   // 初始化到Disable
+  void Run();    // 上使能并运行
+  void Stop();   // 停止并下使能
   void Reset();
+
+//  bool SetEnable(bool enable);
 
   void SetWorkMode(int mode) {
     work_mode_ = mode;
@@ -70,11 +89,41 @@ class SeaControl {
 
   std::string GetState() const;
 
+  RunState GetRunState() const;
+  WorkMode GetWorkMode() const {
+    return static_cast<WorkMode>(work_mode_);
+  }
 
-  void SetVelocity(double vel) { // 低速端 rpm
-    int32_t order = vel * hw_.ratio; // Synapticon Target Velocity是高速端rpm
+
+  void SetVelocity(double vel) { // 低速端 rad/s
+    int32_t order = vel * rad2rpm * hw_.ratio; // Synapticon Target Velocity是高速端rpm
     setTargetVelocityRaw(0, order);
   }
+
+  void SetPosition(double pos) { // 高速端 rad
+    int32_t order = pos * cnt_per_rad_high_;
+
+    // 送入规划器
+//    setTargetPositionRaw(0, order);
+  }
+
+
+  void SetStiffness(double stiffness) {
+    imp_.stiffness = stiffness;
+    config_["impedance"]["stiffness"] = stiffness;
+  }
+
+  void SetDamping(double damping) {
+    imp_.damping = damping;
+    config_["impedance"]["damping"] = damping;
+  }
+
+
+
+  double GetCurrentPosition();
+  double GetCurrentVelocity();
+
+
 
   void loadConfig(const std::string& config_file);
 
@@ -90,7 +139,9 @@ class SeaControl {
 
   void reset();
 
- private:
+ public:
+  const double rad2rpm = 60 / (2 * M_PI); // rad/s to rpm
+
   YAML::Node config_;
   Ecat ecat_;
   Hardware hw_;
@@ -119,6 +170,9 @@ class SeaControl {
   std::shared_ptr<std::thread> run_thread_{nullptr}; // 处理线程
 
   std::atomic<bool> is_guard_thread_running_{false}; // 线程运行标志
+
+  double cnt_per_rad_high_ {0.0}; // 高速端cnt/rad
+  double cnt_per_rad_low_ {0.0}; // 低速端cnt/rad
 
  private:
 
