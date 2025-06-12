@@ -70,11 +70,13 @@ message StopFeedback {
 }
 
 message SetPositionFeedback {
-  double position = 1; // in radians
+  double pos = 1; // in radians
+  double max_vel = 2;
+  double max_acc = 3;
 }
 
 message SetVelocityFeedback {
-  double velocity = 1; // in radians per second
+  double vel = 1; // in radians per second
 }
 
 
@@ -105,11 +107,13 @@ message StopCommand {
 }
 
 message SetPositionCommand {
-  double position = 1; // in radians
+  double pos = 1; // in radians
+  double max_vel = 2;
+  double max_acc = 3;
 }
 
 message SetVelocityCommand {
-  double velocity = 1; // in radians per second
+  double vel = 1; // in radians per second
 }
 
 message ControlCommand {

@@ -267,7 +267,9 @@ void zmq_server(SeaControl* seaControl) {
     sea::ControlFeedback feedback;
 
     if (control_command.has_stop()) {
+
       seaControl->Stop();
+
       feedback.mutable_stop()->set_stop(true);
 
     } else if (control_command.has_get_config()) {
@@ -288,28 +290,40 @@ void zmq_server(SeaControl* seaControl) {
       status->set_current_velocity(seaControl->GetCurrentVelocity());
 
     } else if (control_command.has_set_velocity()) {
-      double velocity = control_command.set_velocity().velocity();
+      double velocity = control_command.set_velocity().vel();
+
       seaControl->SetVelocity(velocity);
-      feedback.mutable_set_velocity()->set_velocity(velocity);
+
+      feedback.mutable_set_velocity()->set_vel(velocity);
 
     } else if (control_command.has_set_position()) {
-      double position = control_command.set_position().position();
-      seaControl->SetPosition(position);
-      feedback.mutable_set_position()->set_position(position);
+      double position = control_command.set_position().pos();
+      double max_vel = control_command.set_position().max_vel();
+      double max_acc = control_command.set_position().max_acc();
+
+      seaControl->SetPosition(position, max_vel, max_acc);
+
+      feedback.mutable_set_position()->set_pos(position);
+      feedback.mutable_set_position()->set_max_vel(max_vel);
+      feedback.mutable_set_position()->set_max_acc(max_acc);
 
     } else if (control_command.has_set_damping()) {
       double damping = control_command.set_damping().damping();
+
       seaControl->SetDamping(damping);
+
       feedback.mutable_set_damping()->set_damping(damping);
 
     } else if (control_command.has_set_stiffness()) {
       double stiffness = control_command.set_stiffness().stiffness();
+
       seaControl->SetStiffness(stiffness);
+
       feedback.mutable_set_stiffness()->set_stiffness(stiffness);
 
     } else if (control_command.has_set_work_mode()) {
       seaControl->Stop();
-//      usleep(200000);  // 等待200毫秒以确保停止完成
+      usleep(200000);  // 等待200毫秒以确保停止完成
 
       auto work_mode = control_command.set_work_mode().work_mode();
       seaControl->SetWorkMode(work_mode);

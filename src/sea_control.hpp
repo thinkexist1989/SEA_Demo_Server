@@ -100,7 +100,7 @@ class SeaControl {
     setTargetVelocityRaw(0, order);
   }
 
-  void SetPosition(double pos) { // 高速端 rad
+  void SetPosition(double pos, double max_vel = 1.0, double max_acc = 10.0) { // 高速端 rad
     int32_t order = pos * cnt_per_rad_high_;
 
     // 送入规划器
