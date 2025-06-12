@@ -41,7 +41,7 @@ TEST_CASE("client") {
         // 发送请求
         {
           sea::ControlCommand command;
-          command.mutable_set_velocity()->set_velocity(1.0);
+          command.mutable_set_velocity()->set_vel(1.0);
 
           if (!command.SerializeToString(&serialized)) {
             std::cerr << "Failed to serialize statusFeedback." << std::endl;
