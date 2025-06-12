@@ -259,6 +259,7 @@ void SeaControl::run() {
           std::make_shared<std::thread>(&SeaControl::position_handler, this);
       break;
     case WORK_MODE_VELOCITY:
+      spdlog::info("Starting Velocity Handler.");
       run_thread_ =
           std::make_shared<std::thread>(&SeaControl::velocity_handler, this);
       break;

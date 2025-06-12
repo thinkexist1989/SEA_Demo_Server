@@ -290,7 +290,10 @@ void zmq_server(SeaControl* seaControl) {
       status->set_current_velocity(seaControl->GetCurrentVelocity());
 
     } else if (control_command.has_set_velocity()) {
+      
       double velocity = control_command.set_velocity().vel();
+
+      spdlog::info("Setting velocity to: {}", velocity);
 
       seaControl->SetVelocity(velocity);
 
@@ -301,6 +304,9 @@ void zmq_server(SeaControl* seaControl) {
       double max_vel = control_command.set_position().max_vel();
       double max_acc = control_command.set_position().max_acc();
 
+      spdlog::info("Setting position to: {}, max_vel: {}, max_acc: {}",
+                   position, max_vel, max_acc);
+
       seaControl->SetPosition(position, max_vel, max_acc);
 
       feedback.mutable_set_position()->set_pos(position);
@@ -309,6 +315,7 @@ void zmq_server(SeaControl* seaControl) {
 
     } else if (control_command.has_set_damping()) {
       double damping = control_command.set_damping().damping();
+      spdlog::info("Setting damping to: {}", damping);
 
       seaControl->SetDamping(damping);
 
@@ -316,6 +323,7 @@ void zmq_server(SeaControl* seaControl) {
 
     } else if (control_command.has_set_stiffness()) {
       double stiffness = control_command.set_stiffness().stiffness();
+      spdlog::info("Setting stiffness to: {}", stiffness);
 
       seaControl->SetStiffness(stiffness);
 
@@ -326,6 +334,8 @@ void zmq_server(SeaControl* seaControl) {
       usleep(200000);  // 等待200毫秒以确保停止完成
 
       auto work_mode = control_command.set_work_mode().work_mode();
+      spdlog::info("Setting work mode to: {}", (int)work_mode);
+
       seaControl->SetWorkMode(work_mode);
 
       seaControl->Run();
