@@ -31,6 +31,8 @@ message StatusFeedback {
   
   double stiffness = 8; // in N/m 模拟刚度
   double damping = 9; // in N/(m/s) 模拟阻尼
+
+  double spring_angle = 10; // in radians 扭簧角度
   
 }
 

@@ -123,6 +123,42 @@ class SeaControl {
   double GetCurrentPosition();
   double GetCurrentVelocity();
 
+  double GetEncoder1Feedback() { return GetCurrentPosition(); };
+  double GetEncoder2Feedback() {
+    return getSecondaryPositionRaw(0) / cnt_per_rad_low_;
+  }
+
+  double GetSpringAngle() {
+    cur_pos_high = getActualPositionRaw(0); // 高速端 pos(cnt)
+    cur_pos_low = getSecondaryPositionRaw(0); // 低速端 pos(cnt)
+
+    inner_rad = hw_.high_sign * (cur_pos_high - offset_cnt_high) / cnt_per_rad_high_; // 扭簧内圈弧度
+    outer_rad = hw_.low_sign * (cur_pos_low - offset_cnt_low) / cnt_per_rad_low_;    // 扭簧外圈弧度
+
+    delta_rad = outer_rad - inner_rad;      // 内外圈弧度差值
+
+    return delta_rad;
+  }
+
+  double GetExternalForce() {
+    return -GetSpringAngle() * hw_.spring_stiffness; // 返回外力矩
+  }
+
+
+  /// \brief 对编码器进行零点对齐
+  void alignEncoderZero() {
+    // 对编码器进行零点对齐
+    cur_pos_high = getActualPositionRaw(0); // 高速端 pos(cnt)
+
+    cur_pos_low = getSecondaryPositionRaw(0); // 低速端 pos(cnt)
+    cur_vel_low = getSecondaryVelocityRaw(0); // 低速端 vel(rpm)
+
+    // 首次进入初始化
+    offset_cnt_high = cur_pos_high; // 以刚启动的位置作为初始位置
+    offset_cnt_low = cur_pos_low;
+
+  }
+
 
 
   void loadConfig(const std::string& config_file);
@@ -173,6 +209,21 @@ class SeaControl {
 
   double cnt_per_rad_high_ {0.0}; // 高速端cnt/rad
   double cnt_per_rad_low_ {0.0}; // 低速端cnt/rad
+
+
+  int cur_pos_high = 0.0;//高速端 pos(cnt)
+  int cur_vel_high = 0.0;//高速端 vel(rpm?)
+  int cur_tor_high = 0.0;//高速端 torque(1/1000 * 57)
+
+  int cur_pos_low = 0.0;// 低速端 pos(cnt)
+  int cur_vel_low = 0.0;// 低速端 vel(rpm)
+
+  int offset_cnt_high{0}; // 高速端cnt offset
+  int offset_cnt_low{0}; // 低速端cnt offset
+
+  double inner_rad = 0.0;
+  double outer_rad = 0.0;
+  double delta_rad = 0.0; // 内外圈弧度差值
 
  private:
 

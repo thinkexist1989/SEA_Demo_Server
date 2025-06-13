@@ -288,6 +288,11 @@ void zmq_server(SeaControl* seaControl) {
       status->set_damping(seaControl->imp_.damping);
       status->set_current_position(seaControl->GetCurrentPosition());
       status->set_current_velocity(seaControl->GetCurrentVelocity());
+      status->set_encoder1_feedback(seaControl->GetEncoder1Feedback());
+      status->set_encoder2_feedback(seaControl->GetEncoder2Feedback());
+      status->set_spring_angle(seaControl->GetSpringAngle());
+      status->set_external_force(seaControl->GetExternalForce());
+
 
     } else if (control_command.has_set_velocity()) {
       
@@ -367,6 +372,7 @@ int main() {
   std::cout << "ROCOS SEA Application" << std::endl;
 
   auto* seaControl = new SeaControl("sea_config.yml");
+
   seaControl->Init();  // 初始化到Disable状态
 
 

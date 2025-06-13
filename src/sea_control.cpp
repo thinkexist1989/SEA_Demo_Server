@@ -95,6 +95,9 @@ sml::sm<StateMachine> sm{};  // 状态机
 SeaControl::SeaControl(const std::string& config_file) {
   seaControl = this;  // 设置全局实例指针
   loadConfig(config_file);
+
+  seaControl->alignEncoderZero();
+
 }
 
 void SeaControl::loadConfig(const std::string& config_file) {
@@ -326,12 +329,8 @@ void SeaControl::reset() {
 
 void SeaControl::impedance_handler() {
 
-  double inner_rad = 0.0;
-  double outer_rad = 0.0;
-  double target_torque = 0.0;
 
-  int offset_cnt_high{0}; // 高速端cnt offset
-  int offset_cnt_low{0}; // 低速端cnt offset
+  double target_torque = 0.0;
 
   int is_first = 0; // 阻抗模式使用
   double pos = 0.0;
@@ -346,28 +345,29 @@ void SeaControl::impedance_handler() {
   while (sm.is(sml::state<class RUNNING>)) {
 
     // 更新所需数据
-    int cur_pos_high = getActualPositionRaw(0); // 高速端 pos(cnt)
-    int cur_vel_high = getActualVelocityRaw(0); // 高速端 vel(rpm?)
-    int cur_tor_high = getActualTorqueRaw(0);   // 高速端 torque(1/1000 * 57)
+    cur_pos_high = getActualPositionRaw(0); // 高速端 pos(cnt)
+    cur_vel_high = getActualVelocityRaw(0); // 高速端 vel(rpm?)
+    cur_tor_high = getActualTorqueRaw(0);   // 高速端 torque(1/1000 * 57)
 
-    int cur_pos_low = getSecondaryPositionRaw(0); // 低速端 pos(cnt)
-    int cur_vel_low = getSecondaryVelocityRaw(0); // 低速端 vel(rpm)
+    cur_pos_low = getSecondaryPositionRaw(0); // 低速端 pos(cnt)
+    cur_vel_low = getSecondaryVelocityRaw(0); // 低速端 vel(rpm)
 
-    if (is_first < 5)
-    {
-      // 首次进入初始化
-      offset_cnt_high = cur_pos_high; // 以刚启动的位置作为初始位置
-      offset_cnt_low = cur_pos_low;
-
-      // filter.setup(3, sampleRate, cutoff_freq);
-
-      is_first++; // 取消进入
-    }
+//    if (is_first < 5)
+//    {
+//      // 首次进入初始化
+//      offset_cnt_high = cur_pos_high; // 以刚启动的位置作为初始位置
+//      offset_cnt_low = cur_pos_low;
+//
+//      // filter.setup(3, sampleRate, cutoff_freq);
+//
+//      is_first++; // 取消进入
+//    }
 
     inner_rad = hw_.high_sign * (cur_pos_high - offset_cnt_high) / cnt_per_rad_high_; // 扭簧内圈弧度
     outer_rad = hw_.low_sign * (cur_pos_low - offset_cnt_low) / cnt_per_rad_low_;    // 扭簧外圈弧度
 
-    double delta_rad = outer_rad - inner_rad;      // 内外圈弧度差值
+    delta_rad = outer_rad - inner_rad;      // 内外圈弧度差值
+
     double sensor_torque = -delta_rad * hw_.spring_stiffness; // 检测到的外力矩
 
     pos = inner_rad; // 以外圈编码器作为最终位置
