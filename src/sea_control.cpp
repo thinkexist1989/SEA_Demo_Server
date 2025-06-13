@@ -244,17 +244,29 @@ void SeaControl::start() {
 }
 
 void SeaControl::run() {
+
+  if(run_thread_ && run_thread_->joinable()) {
+    spdlog::warn("Run thread is already running, stopping it first.");
+
+    run_thread_->join();  // 等待当前线程结束
+    // run_thread_.reset();  // 终止当前线程
+  }
+
+
   // 这里是主循环，处理不同的工作模式
   switch (work_mode_) {
     case WORK_MODE_IMPEDANCE:
+      spdlog::info("Starting Impedance Handler.");
       run_thread_ =
           std::make_shared<std::thread>(&SeaControl::impedance_handler, this);
       break;
     case WORK_MODE_ZERO_FORCE:
+
       run_thread_ =
           std::make_shared<std::thread>(&SeaControl::zero_force_handler, this);
       break;
     case WORK_MODE_POSITION:
+      spdlog::info("Starting Position Handler.");
       run_thread_ =
           std::make_shared<std::thread>(&SeaControl::position_handler, this);
       break;
