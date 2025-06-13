@@ -25,8 +25,8 @@ message StatusFeedback {
   double current_position = 3; // in radians
   double current_velocity = 4; // in radians per second
 
-  int32 encoder1_feedback = 5; // in counts
-  int32 encoder2_feedback = 6; // in counts
+  double encoder1_feedback = 5; // in counts
+  double encoder2_feedback = 6; // in counts
   double external_force = 7; // in N
   
   double stiffness = 8; // in N/m 模拟刚度
