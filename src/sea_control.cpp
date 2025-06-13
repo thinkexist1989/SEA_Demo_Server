@@ -64,8 +64,7 @@ struct StateMachine {
 
     return make_transition_table(
         // 初始状态
-        *state<class DISABLED> + sml::on_entry<_> / action_init =
-            state<class STOPPED>,
+        *state<class DISABLED> / action_init = state<class STOPPED>,
         // state<class STOPPED> + sml::on_entry<_> / action_init,
         // 状态切换
         state<class STOPPED> + event<EventStart_REQ> = state<class STARTING>,
