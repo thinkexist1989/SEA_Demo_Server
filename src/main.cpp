@@ -184,7 +184,7 @@ void test_velocity() {
 
   std::cout << "State3: " << seaControl->GetState() << std::endl;
 
-  seaControl->Init();
+//  seaControl->Init();
 
   usleep(1000000);  // 等待1秒钟
 
@@ -380,7 +380,7 @@ int main() {
 
   auto* seaControl = new SeaControl("sea_config.yml");
 
-  seaControl->Init();  // 初始化到Disable状态
+//  seaControl->Init();  // 初始化到Stopped状态
 
 
   // 启动ZMQ服务器线程
