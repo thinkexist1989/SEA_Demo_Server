@@ -380,7 +380,7 @@ int main() {
 
   auto* seaControl = new SeaControl("sea_config.yml");
 
-//  seaControl->Init();  // 初始化到Stopped状态
+  seaControl->Init();  // 到Disabled状态
 
 
   // 启动ZMQ服务器线程

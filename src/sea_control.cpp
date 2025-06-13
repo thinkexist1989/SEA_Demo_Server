@@ -22,6 +22,7 @@ class RUNNING {};
 class ERROR {};
 class STARTING {};  // 过渡状态
 class STOPPING {};  // 过渡状态
+class UNKNOWN {};  // 未知状态
 
 // 事件定义
 struct EventInit_REQ {};
@@ -64,7 +65,8 @@ struct StateMachine {
 
     return make_transition_table(
         // 初始状态
-        *state<class DISABLED> / action_init = state<class STOPPED>,
+        *state<class UNKNOWN> + event<EventInit_REQ> = state<class DISABLED>,
+        state<class DISABLED> / action_init = state<class STOPPED>,
         // state<class STOPPED> + sml::on_entry<_> / action_init,
         // 状态切换
         state<class STOPPED> + event<EventStart_REQ> = state<class STARTING>,
