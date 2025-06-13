@@ -345,6 +345,13 @@ void zmq_server(SeaControl* seaControl) {
 
       seaControl->Run();
 
+    } else if (control_command.has_reset()) {
+      spdlog::info("Resetting....");
+
+      seaControl->Reset();
+
+      feedback.mutable_reset();
+
     } else {
       std::cerr << "Unknown command received." << std::endl;
       continue;
