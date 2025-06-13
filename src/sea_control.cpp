@@ -792,7 +792,7 @@ RunState SeaControl::GetRunState() const {
   }
 }
 double SeaControl::GetCurrentPosition() {
-  return getActualPositionRaw(0) / cnt_per_rad_high_;
+  return getActualPositionRaw(0) / cnt_per_rad_high_ / hw_.ratio;
 }
 
 double SeaControl::GetCurrentVelocity() { // rad/s
