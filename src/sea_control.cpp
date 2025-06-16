@@ -6,8 +6,6 @@
 
 #include <boost/sml.hpp>
 
-#define CYCLE_TIME 0.001
-
 using namespace rocos;
 
 namespace {
@@ -22,7 +20,7 @@ class RUNNING {};
 class ERROR {};
 class STARTING {};  // 过渡状态
 class STOPPING {};  // 过渡状态
-class UNKNOWN {};  // 未知状态
+class UNKNOWN {};   // 未知状态
 
 // 事件定义
 struct EventInit_REQ {};
@@ -98,7 +96,6 @@ SeaControl::SeaControl(const std::string& config_file) {
   loadConfig(config_file);
 
   seaControl->alignEncoderZero();
-
 }
 
 void SeaControl::loadConfig(const std::string& config_file) {
@@ -151,7 +148,7 @@ void SeaControl::loadConfig(const std::string& config_file) {
   hw_.spring_stiffness = hw["spring_stiffness"].as<double>(126.0507);
 
   cnt_per_rad_high_ = hw_.high_encoder_ppr * hw_.ratio / (2 * M_PI);
-  cnt_per_rad_low_  = hw_.low_encoder_ppr / (2 * M_PI);
+  cnt_per_rad_low_ = hw_.low_encoder_ppr / (2 * M_PI);
 
   if (!config_["impedance"]) {
     spdlog::error("Can not find [impedance] TAG. ");
@@ -248,14 +245,12 @@ void SeaControl::start() {
 }
 
 void SeaControl::run() {
-
-  if(run_thread_ && run_thread_->joinable()) {
+  if (run_thread_ && run_thread_->joinable()) {
     spdlog::warn("Run thread is already running, stopping it first.");
 
     run_thread_->join();  // 等待当前线程结束
     // run_thread_.reset();  // 终止当前线程
   }
-
 
   // 这里是主循环，处理不同的工作模式
   switch (work_mode_) {
@@ -329,56 +324,53 @@ void SeaControl::reset() {
 }
 
 void SeaControl::impedance_handler() {
-
-  int offset_cnt_high; // 以刚启动的位置作为初始位置
+  int offset_cnt_high;  // 以刚启动的位置作为初始位置
 
   double target_torque = 0.0;
 
-  int is_first = 0; // 阻抗模式使用
+  int is_first = 0;  // 阻抗模式使用
   double pos = 0.0;
   double last_pos = 0.0;
   double vel = 0.0;
-  double offset_torque = 0.0; // 阻抗模式使用
-  double last_offset_torque = 0.0; // 阻抗模式使用
-  double vel_torque = 0.0; // 阻抗模式使用
+  double offset_torque = 0.0;       // 阻抗模式使用
+  double last_offset_torque = 0.0;  // 阻抗模式使用
+  double vel_torque = 0.0;          // 阻抗模式使用
 
-  double command_torque = 0.0; // 阻抗模式使用
+  double command_torque = 0.0;  // 阻抗模式使用
 
   while (sm.is(sml::state<class RUNNING>)) {
-
     // 更新所需数据
-    int cur_pos_high = getActualPositionRaw(0); // 高速端 pos(cnt)
-    int cur_vel_high = getActualVelocityRaw(0); // 高速端 vel(rpm?)
-    int cur_tor_high = getActualTorqueRaw(0);   // 高速端 torque(1/1000 * 57)
+    int cur_pos_high = getActualPositionRaw(0);  // 高速端 pos(cnt)
+    int cur_vel_high = getActualVelocityRaw(0);  // 高速端 vel(rpm?)
+    int cur_tor_high = getActualTorqueRaw(0);    // 高速端 torque(1/1000 * 57)
 
-    int cur_pos_low = getSecondaryPositionRaw(0); // 低速端 pos(cnt)
-    int cur_vel_low = getSecondaryVelocityRaw(0); // 低速端 vel(rpm)
+    int cur_pos_low = getSecondaryPositionRaw(0);  // 低速端 pos(cnt)
+    int cur_vel_low = getSecondaryVelocityRaw(0);  // 低速端 vel(rpm)
 
-    if (is_first < 5)
-    {
+    if (is_first < 5) {
       // 首次进入初始化
-      offset_cnt_high = cur_pos_high; // 以刚启动的位置作为初始位置
-//      offset_cnt_low = cur_pos_low;
+      offset_cnt_high = cur_pos_high;  // 以刚启动的位置作为初始位置
+                                       //      offset_cnt_low = cur_pos_low;
 
-      is_first++; // 取消进入
+      is_first++;  // 取消进入
     }
 
-    double inner_rad = hw_.high_sign * (cur_pos_high - offset_cnt_high) / cnt_per_rad_high_; // 扭簧内圈弧度
+    double inner_rad = hw_.high_sign * (cur_pos_high - offset_cnt_high) /
+                       cnt_per_rad_high_;  // 扭簧内圈弧度
 
-    double sensor_torque = GetExternalForce() ; // 检测到的外力矩
+    double sensor_torque = GetExternalForce();  // 检测到的外力矩
 
-    pos = inner_rad; // 以外圈编码器作为最终位置
+    pos = inner_rad;  // 以外圈编码器作为最终位置
     vel = (pos - last_pos) / CYCLE_TIME;
 
-    target_torque = -(pos * imp_.stiffness + vel * imp_.damping); // 目标力矩
+    target_torque = -(pos * imp_.stiffness + vel * imp_.damping);  // 目标力矩
 
     offset_torque = target_torque - sensor_torque;
     vel_torque = (offset_torque - last_offset_torque);
 
     command_torque = target_torque + (15 * offset_torque + 3.5 * vel_torque);
 
-    if (std::abs(command_torque) > 57)
-    {
+    if (std::abs(command_torque) > 57) {
       command_torque = command_torque > 0 ? 57 : -57;
     }
 
@@ -388,7 +380,6 @@ void SeaControl::impedance_handler() {
 
     last_pos = pos;
     last_offset_torque = offset_torque;
-
 
     waitForSignal(0);  // 等待信号
   }
@@ -405,7 +396,71 @@ void SeaControl::velocity_handler() {
 }
 
 void SeaControl::position_handler() {
+
+  input.current_position = {GetCurrentPosition()};  // 当前实际位置（低速端）
+  input.max_velocity = {1.0};                  //
+  input.max_acceleration = {10.0};              // 最大加速度
+  input.max_jerk = {100.0};                     // 最大加加速度
+  input.target_position = {input.current_position};   // 目标位置（低速端）
+  input.target_velocity = {0.0};                    // 目标速度（低速端）
+  input.target_acceleration = {0.0};                // 目标加速度（低速端）
+  input.control_interface = ruckig::ControlInterface::Position;  // 控制接口为位置模式
+
   while (sm.is(sml::state<class RUNNING>)) {
+    if(!is_target_pos_updated_) {
+      continue;
+    }
+
+    auto result = ruckig.update(input, output);  // 更新Ruckig状态
+    if (result == ruckig::Result::Working) {     // 正在运动
+      setTargetPositionRaw(0, output.new_position[0] * hw_.ratio * cnt_per_rad_high_);
+      output.pass_to_input(input);
+
+    } else if (result == ruckig::Result::Finished) {  // 运动完成
+      is_target_pos_updated_ = false;
+      input.current_position[0] = GetCurrentPosition();  // 当前实际位置（低速端）
+      input.target_position = input.current_position;
+
+    } else if (result <= ruckig::Result::Error) {  // 发生错误
+
+      input.target_position[0] = GetCurrentPosition();  // 更新目标位置为当前实际位置
+
+
+      switch (result) {
+        case ruckig::Result::ErrorInvalidInput:
+          spdlog::error("Ruckig Error: Invalid input parameters.");
+          break;
+        case ruckig::Result::ErrorTrajectoryDuration:
+          spdlog::error("Ruckig Error: Trajectory duration exceeds limits.");
+          break;
+        case ruckig::Result::ErrorPositionalLimits:
+          spdlog::error("Ruckig Error: Trajectory exceeds positional limits.");
+          break;
+        case ruckig::Result::ErrorZeroLimits:
+          spdlog::error("Ruckig Error: Zero limits conflict.");
+          break;
+        case ruckig::Result::ErrorExecutionTimeCalculation:
+          spdlog::error("Ruckig Error: Execution time calculation error.");
+          break;
+        case ruckig::Result::ErrorSynchronizationCalculation:
+          spdlog::error("Ruckig Error: Synchronization calculation error.");
+          break;
+        default:
+          spdlog::error("Ruckig Error: Unclassified error.");
+          break;
+      }
+    }
+
+    waitForSignal(0);  // 等待信号
+  }
+
+
+  input.control_interface = ruckig::ControlInterface::Velocity;  // 控制接口为位置模式
+  input.target_velocity = {0.0};
+  input.target_acceleration = {0.0};
+  while(ruckig.update(input, output) == ruckig::Result::Working) {  // 正在运动
+    setTargetPositionRaw(0, output.new_position[0] * hw_.ratio * cnt_per_rad_high_);
+    output.pass_to_input(input);
     waitForSignal(0);  // 等待信号
   }
 
@@ -792,13 +847,13 @@ double SeaControl::GetCurrentPosition() {
   return getActualPositionRaw(0) / cnt_per_rad_high_ / hw_.ratio;
 }
 
-double SeaControl::GetCurrentVelocity() { // rad/s
+double SeaControl::GetCurrentVelocity() {  // rad/s
   return getActualVelocityRaw(0) / hw_.ratio / rad2rpm;
 }
 
-//bool SeaControl::SetEnable(bool enable) {
-//  if (enable)
-//    return setDriverState(DriveState::OperationEnabled);
-//  else
-//    return setDriverState(DriveState::SwitchOnDisabled);
-//}
+// bool SeaControl::SetEnable(bool enable) {
+//   if (enable)
+//     return setDriverState(DriveState::OperationEnabled);
+//   else
+//     return setDriverState(DriveState::SwitchOnDisabled);
+// }

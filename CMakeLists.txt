@@ -9,6 +9,7 @@ find_package(protobuf REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(tinyxml2 REQUIRED)
 find_package(yaml-cpp REQUIRED)
+find_package(ruckig REQUIRED)
 
 add_subdirectory(third-party/sml-1.1.11)
 
@@ -26,7 +27,7 @@ add_executable(server
         src/robotMath.cc
         ${PROTO_SRCS} ${PROTO_HDRS})
 target_include_directories(server PUBLIC ${Protobuf_INCLUDE_DIRS} ${CMAKE_CURRENT_BINARY_DIR})
-target_link_libraries(server PUBLIC cppzmq protobuf::libprotobuf sml::sml spdlog::spdlog rocos::ecat_config tinyxml2::tinyxml2 yaml-cpp::yaml-cpp)
+target_link_libraries(server PUBLIC cppzmq protobuf::libprotobuf sml::sml spdlog::spdlog rocos::ecat_config tinyxml2::tinyxml2 yaml-cpp::yaml-cpp ruckig::ruckig)
 
 file(COPY config/sea_config.yml
      DESTINATION ${CMAKE_BINARY_DIR})
@@ -34,5 +35,5 @@ file(COPY config/sea_config.yml
 enable_testing()
 add_executable(unit_test test/unit_test.cpp ${PROTO_SRCS} ${PROTO_HDRS})
 target_include_directories(unit_test PUBLIC ${Protobuf_INCLUDE_DIRS} ${CMAKE_CURRENT_BINARY_DIR})
-target_link_libraries(unit_test PUBLIC cppzmq protobuf::libprotobuf sml::sml spdlog::spdlog rocos::ecat_config tinyxml2::tinyxml2 yaml-cpp::yaml-cpp)
+target_link_libraries(unit_test PUBLIC cppzmq protobuf::libprotobuf sml::sml spdlog::spdlog rocos::ecat_config tinyxml2::tinyxml2 yaml-cpp::yaml-cpp ruckig::ruckig)
 add_test(NAME unit_test COMMAND unit_test)

@@ -8,6 +8,7 @@
 #include <rocos_ecm/ecat_config.h>
 #include <spdlog/spdlog.h>
 #include <yaml-cpp/yaml.h>
+#include <ruckig/ruckig.hpp>
 
 #include "ethercat.hpp"
 
@@ -18,6 +19,9 @@
 #define WORK_MODE_ZERO_FORCE 1
 #define WORK_MODE_POSITION 2
 #define WORK_MODE_VELOCITY 3
+
+#define CYCLE_TIME 0.001
+
 
 namespace rocos {
 
@@ -101,10 +105,11 @@ class SeaControl {
   }
 
   void SetPosition(double pos, double max_vel = 1.0, double max_acc = 10.0) { // 高速端 rad
-    int32_t order = pos * cnt_per_rad_high_;
+    input.target_position[0] = pos; // 目标位置
+    input.max_velocity[0] = max_vel; // 最大速度
+    input.max_acceleration[0] = max_acc; // 最大加速度
 
-    // 送入规划器
-//    setTargetPositionRaw(0, order);
+    is_target_pos_updated_ = true; // 标记位置已更新
   }
 
 
@@ -119,8 +124,11 @@ class SeaControl {
   }
 
 
-
+  /// \brief 获取低速端位置（rad）
+  /// \return
   double GetCurrentPosition();
+  /// \brief 获取低速端速度（rad/s）
+  /// \return
   double GetCurrentVelocity();
 
   double GetEncoder1Feedback() { return GetCurrentPosition(); };
@@ -176,7 +184,7 @@ class SeaControl {
   void reset();
 
  public:
-  const double rad2rpm = 60 / (2 * M_PI); // rad/s to rpm
+  static constexpr double rad2rpm = 60 / (2 * M_PI); // rad/s to rpm
 
   YAML::Node config_;
   Ecat ecat_;
@@ -224,6 +232,13 @@ class SeaControl {
   double inner_rad_ = 0.0;
   double outer_rad_ = 0.0;
   double delta_rad_ = 0.0; // 内外圈弧度差值
+
+  //位置模式用
+  ruckig::Ruckig<1> ruckig {CYCLE_TIME};  // 创建Ruckig对象
+  ruckig::InputParameter<1> input;       // 输入参数
+  ruckig::OutputParameter<1> output;  // 输出参数
+
+  std::atomic<bool>  is_target_pos_updated_  {false}; // 位置是否更新
 
  private:
 
