@@ -292,10 +292,10 @@ void SeaControl::stop() {
 }
 
 void SeaControl::init() {
-  is_guard_thread_running_ = false;
   if (guard_thread_ && guard_thread_->joinable()) {
-    spdlog::warn("Guard thread is already running, stopping it first.");
-    guard_thread_->join();
+    spdlog::warn("Guard thread is already running.");
+    // guard_thread_->join();
+    return;
   }
   spdlog::info("Starting Drive Guard thread.");
 
@@ -479,7 +479,63 @@ void SeaControl::position_handler() {
 }
 
 void SeaControl::zero_force_handler() {
+int offset_cnt_high;  // 以刚启动的位置作为初始位置
+
+  double target_torque = 0.0;
+
+  int is_first = 0;  // 阻抗模式使用
+  double pos = 0.0;
+  double last_pos = 0.0;
+  double vel = 0.0;
+  double offset_torque = 0.0;       // 阻抗模式使用
+  double last_offset_torque = 0.0;  // 阻抗模式使用
+  double vel_torque = 0.0;          // 阻抗模式使用
+
+  double command_torque = 0.0;  // 阻抗模式使用
+
   while (sm.is(sml::state<class RUNNING>)) {
+    // 更新所需数据
+    int cur_pos_high = getActualPositionRaw(0);  // 高速端 pos(cnt)
+    int cur_vel_high = getActualVelocityRaw(0);  // 高速端 vel(rpm?)
+    int cur_tor_high = getActualTorqueRaw(0);    // 高速端 torque(1/1000 * 57)
+
+    int cur_pos_low = getSecondaryPositionRaw(0);  // 低速端 pos(cnt)
+    int cur_vel_low = getSecondaryVelocityRaw(0);  // 低速端 vel(rpm)
+
+    if (is_first < 5) {
+      // 首次进入初始化
+      offset_cnt_high = cur_pos_high;  // 以刚启动的位置作为初始位置
+                                       //      offset_cnt_low = cur_pos_low;
+
+      is_first++;  // 取消进入
+    }
+
+    double inner_rad = hw_.high_sign * (cur_pos_high - offset_cnt_high) /
+                       cnt_per_rad_high_;  // 扭簧内圈弧度
+
+    double sensor_torque = GetExternalForce();  // 检测到的外力矩
+
+    pos = inner_rad;  // 以外圈编码器作为最终位置
+    vel = (pos - last_pos) / CYCLE_TIME;
+
+    target_torque = -(pos * 0 + vel * imp_.damping);  // 目标力矩，刚度为0
+
+    offset_torque = target_torque - sensor_torque;
+    vel_torque = (offset_torque - last_offset_torque);
+
+    command_torque = target_torque + (15 * offset_torque + 3.5 * vel_torque);
+
+    if (std::abs(command_torque) > 57) {
+      command_torque = command_torque > 0 ? 57 : -57;
+    }
+
+    int send_torque_value = command_torque / 57.0 * 1000;
+
+    setTargetTorqueRaw(0, send_torque_value);
+
+    last_pos = pos;
+    last_offset_torque = offset_torque;
+
     waitForSignal(0);  // 等待信号
   }
 

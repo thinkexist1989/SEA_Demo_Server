@@ -266,7 +266,7 @@ void zmq_server(SeaControl* seaControl) {
     // 解析接收到的消息
     sea::ControlFeedback feedback;
 
-    if (control_command.has_stop()) {
+    if (control_command.has_stop()) { // 停止
 
       seaControl->Stop();
 
@@ -294,7 +294,7 @@ void zmq_server(SeaControl* seaControl) {
       status->set_external_force(seaControl->GetExternalForce());
 
 
-    } else if (control_command.has_set_velocity()) {
+    } else if (control_command.has_set_velocity()) { // 速度
       
       double velocity = control_command.set_velocity().vel();
 
@@ -304,7 +304,7 @@ void zmq_server(SeaControl* seaControl) {
 
       feedback.mutable_set_velocity()->set_vel(velocity);
 
-    } else if (control_command.has_set_position()) {
+    } else if (control_command.has_set_position()) { // 位置
       double position = control_command.set_position().pos();
       double max_vel = control_command.set_position().max_vel();
       double max_acc = control_command.set_position().max_acc();
@@ -318,7 +318,7 @@ void zmq_server(SeaControl* seaControl) {
       feedback.mutable_set_position()->set_max_vel(max_vel);
       feedback.mutable_set_position()->set_max_acc(max_acc);
 
-    } else if (control_command.has_set_damping()) {
+    } else if (control_command.has_set_damping()) { // 阻抗
       double damping = control_command.set_damping().damping();
       spdlog::info("Setting damping to: {}", damping);
 
@@ -345,7 +345,7 @@ void zmq_server(SeaControl* seaControl) {
 
       seaControl->Run();
 
-    } else if (control_command.has_reset()) {
+    } else if (control_command.has_reset()) { // 重置
       spdlog::info("Resetting....");
 
       seaControl->Reset();
