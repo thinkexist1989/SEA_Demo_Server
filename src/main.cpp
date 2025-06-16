@@ -388,16 +388,23 @@ int main() {
 
   // 监测处理键盘输入
   while (isRunning) {
-    std::string input;
-    std::cout << "Enter command (v, p, i, z): ";
-    std::getline(std::cin, input);
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-    if (input == "v") {
-    } else if (input == "p") {
-    } else if (input == "i") {
-    } else if (input == "z") {
-    } else {
-      std::cout << "Unknown command: " << input << std::endl;
-    }
+        // 这里可以添加处理键盘输入的逻辑
+        // 例如，使用 std::getline() 从标准输入读取命令
+        // 并根据命令调用 seaControl 的相应方法
+
+        // 示例代码（未实现具体功能）：
+//    std::string input;
+//    std::cout << "Enter command (v, p, i, z): ";
+//    std::getline(std::cin, input);
+//
+//    if (input == "v") {
+//    } else if (input == "p") {
+//    } else if (input == "i") {
+//    } else if (input == "z") {
+//    } else {
+//      std::cout << "Unknown command: " << input << std::endl;
+//    }
   }
 }
