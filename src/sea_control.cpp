@@ -282,6 +282,11 @@ void SeaControl::run() {
 
 void SeaControl::stop() {
   // 这里是停止运动，下使能
+  if (run_thread_ && run_thread_->joinable()) {
+    spdlog::warn("Stopping...wait for run thread to finish.");
+
+    run_thread_->join();  // 等待当前线程结束
+  }
 
   setDriverState(DriveState::SwitchOnDisabled);  // 下使能
 }
