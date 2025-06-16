@@ -413,7 +413,7 @@ void SeaControl::position_handler() {
 
     auto result = ruckig.update(input, output);  // 更新Ruckig状态
     if (result == ruckig::Result::Working) {     // 正在运动
-      setTargetPositionRaw(0, output.new_position[0] * hw_.ratio * cnt_per_rad_high_);
+      setTargetPositionRaw(0, output.new_position[0] * cnt_per_rad_high_);
       output.pass_to_input(input);
 
     } else if (result == ruckig::Result::Finished) {  // 运动完成
@@ -844,7 +844,7 @@ RunState SeaControl::GetRunState() const {
   }
 }
 double SeaControl::GetCurrentPosition() {
-  return getActualPositionRaw(0) / cnt_per_rad_high_ / hw_.ratio;
+  return getActualPositionRaw(0) / cnt_per_rad_high_;
 }
 
 double SeaControl::GetCurrentVelocity() {  // rad/s
