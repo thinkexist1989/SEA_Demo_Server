@@ -412,6 +412,7 @@ void SeaControl::position_handler() {
   input.target_velocity = {0.0};                    // 目标速度（低速端）
   input.target_acceleration = {0.0};                // 目标加速度（低速端）
   input.control_interface = ruckig::ControlInterface::Position;  // 控制接口为位置模式
+  input.synchronization = ruckig::Synchronization::None;  // 不进行同步
 
   while (sm.is(sml::state<class RUNNING>)) {
     if(!is_target_pos_updated_) {
@@ -468,7 +469,7 @@ void SeaControl::position_handler() {
     input.target_velocity = {0.0};
     input.target_acceleration = {0.0};
     while(ruckig.update(input, output) == ruckig::Result::Working) {  // 正在运动
-      setTargetPositionRaw(0, output.new_position[0] * hw_.ratio * cnt_per_rad_high_);
+      setTargetPositionRaw(0, output.new_position[0] * cnt_per_rad_high_);
       output.pass_to_input(input);
       waitForSignal(0);  // 等待信号
     }
