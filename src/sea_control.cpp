@@ -292,11 +292,12 @@ void SeaControl::stop() {
 }
 
 void SeaControl::init() {
+  is_guard_thread_running_ = false;
   if (guard_thread_ && guard_thread_->joinable()) {
     spdlog::warn("Guard thread is already running, stopping it first.");
-    is_guard_thread_running_ = false;
     guard_thread_->join();
   }
+  spdlog::info("Starting Drive Guard thread.");
 
   is_guard_thread_running_ = true;
 
@@ -402,6 +403,7 @@ void SeaControl::velocity_handler() {
 
 void SeaControl::position_handler() {
 
+  is_target_pos_updated_ = false;  // 初始化位置更新标志
   input.current_position = {GetCurrentPosition()};  // 当前实际位置（低速端）
   input.max_velocity = {1.0};                  //
   input.max_acceleration = {10.0};              // 最大加速度
@@ -427,7 +429,7 @@ void SeaControl::position_handler() {
       input.target_position = input.current_position;
 
     } else if (result <= ruckig::Result::Error) {  // 发生错误
-
+      is_target_pos_updated_ = false;
       input.target_position[0] = GetCurrentPosition();  // 更新目标位置为当前实际位置
 
 
@@ -459,14 +461,17 @@ void SeaControl::position_handler() {
     waitForSignal(0);  // 等待信号
   }
 
+  if(is_target_pos_updated_) {
+    spdlog::info("Stopping moving......");
 
-  input.control_interface = ruckig::ControlInterface::Velocity;  // 控制接口为位置模式
-  input.target_velocity = {0.0};
-  input.target_acceleration = {0.0};
-  while(ruckig.update(input, output) == ruckig::Result::Working) {  // 正在运动
-    setTargetPositionRaw(0, output.new_position[0] * hw_.ratio * cnt_per_rad_high_);
-    output.pass_to_input(input);
-    waitForSignal(0);  // 等待信号
+    input.control_interface = ruckig::ControlInterface::Velocity;  // 控制接口为速度模式
+    input.target_velocity = {0.0};
+    input.target_acceleration = {0.0};
+    while(ruckig.update(input, output) == ruckig::Result::Working) {  // 正在运动
+      setTargetPositionRaw(0, output.new_position[0] * hw_.ratio * cnt_per_rad_high_);
+      output.pass_to_input(input);
+      waitForSignal(0);  // 等待信号
+    }
   }
 
   spdlog::info("Exit position control loop.");
